@@ -1,0 +1,66 @@
+/* 전체 스타일 */
+body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: #f8f9fa;
+    color: #212529;
+}
+
+/* 테이블 스타일 */
+.table {
+    font-size: 0.9rem;
+}
+
+.table th {
+    position: relative;
+    background-color: #f1f8ff;
+    vertical-align: middle;
+}
+
+.sort-buttons {
+    margin-top: 5px;
+    display: flex;
+    justify-content: center;
+}
+
+.sort-buttons button {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+}
+
+/* 카드 스타일 */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: none;
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    border-top-left-radius: 0.5rem !important;
+    border-top-right-radius: 0.5rem !important;
+}
+
+/* 버튼 스타일 */
+.btn {
+    border-radius: 0.25rem;
+}
+
+/* 테이블 반응형 */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+    
+    .sort-buttons {
+        flex-direction: column;
+    }
+}
+
+/* 강조 효과 */
+.highlight {
+    background-color: #fffde7;
+}
+
+/* 숫자 값 오른쪽 정렬 */
+.number-cell {
+    text-align: right;
+} 

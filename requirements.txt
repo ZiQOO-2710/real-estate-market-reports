@@ -1,0 +1,9 @@
+flask
+python-dotenv
+supabase
+pandas
+numpy
+werkzeug
+geopy
+requests
+chardet
