@@ -225,9 +225,12 @@
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <script>
         // 지도 데이터 준비
-        const centerLat = {{ center_lat if center_lat is not none else 36.815 }};
-        const centerLon = {{ center_lon if center_lon is not none else 127.1138 }};
+        const centerLat = {{ center_lat if center_lat is not none else 37.5665 }};  // 서울시청 좌표
+        const centerLon = {{ center_lon if center_lon is not none else 126.978 }};
         const radius = {{ (data[0].get('중심점과의거리', 1) if data else 1) }} * 1000; // m
+        
+        console.log(`[MAP DEBUG] centerLat: ${centerLat}, centerLon: ${centerLon}`);
+        console.log(`[MAP DEBUG] Original center_lat: {{ center_lat }}, center_lon: {{ center_lon }}`);
         const aptList = [
             {% for row in data %}
             {
@@ -240,13 +243,23 @@
         ];
 
         // 지도 초기화
-        const map = L.map('map').setView([centerLat, centerLon], 14);
+        console.log(`[MAP DEBUG] 지도 초기화 - 중심 좌표: ${centerLat}, ${centerLon}`);
+        
+        // 좌표가 유효한지 확인
+        if (isNaN(centerLat) || isNaN(centerLon)) {
+            console.error('[MAP ERROR] 잘못된 좌표값:', centerLat, centerLon);
+            centerLat = 37.5665;  // 서울시청 기본값
+            centerLon = 126.978;
+        }
+        
+        const map = L.map('map').setView([centerLat, centerLon], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap'
         }).addTo(map);
 
-        // 중심점 마커
+        // 중심점 표시 (실제 좌표가 있을 때만)
+        {% if center_lat is not none and center_lon is not none %}
         const centerMarker = L.marker([centerLat, centerLon]).addTo(map);
         centerMarker.bindPopup('<b>중심점(입력 주소)</b>').openPopup();
 
@@ -257,6 +270,13 @@
             fillOpacity: 0.3,
             radius: {{ session.get('filter_params', {}).get('radius', 1)|float * 1000 }}
         }).addTo(map);
+        {% else %}
+        // 주소 변환 실패 시 알림
+        L.popup()
+            .setLatLng([centerLat, centerLon])
+            .setContent('<b>주소 변환 실패</b><br>입력한 주소의 좌표를 찾을 수 없어 기본 위치(서울)를 표시합니다.')
+            .openOn(map);
+        {% endif %}
 
         // 단지 마커
         aptList.forEach(function(apt) {

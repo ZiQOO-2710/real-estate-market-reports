@@ -33,44 +33,59 @@ def get_latlon_from_address(address: str) -> Tuple[Optional[float], Optional[flo
     캐싱과 레이트 제한이 적용됨.
     """
     if not address or not address.strip():
+        print(f'[get_latlon_from_address] 빈 주소 입력')
         return None, None
     
-    address = address.strip()
+    original_address = address.strip()
     
-    # 캐시 확인
-    if address in _cache:
-        return _cache[address]
+    # 여러 주소 형식 시도
+    address_variants = [
+        original_address,
+        # "서울 강남구 삼성동" 형식
+        original_address.replace('시 ', ' ').replace('구 ', ' ').replace('동 ', ' '),
+        # "서울특별시 강남구 삼성동" 형식
+        original_address + "동" if not original_address.endswith(('동', '읍', '면', '리')) else original_address,
+    ]
     
-    print(f'[get_latlon_from_address] 주소 변환 시도: {address}')
-    
-    # 레이트 제한 적용
-    _rate_limit_wait()
-    
-    try:
-        url = f"https://dapi.kakao.com/v2/local/search/address.json?query={quote(address)}"
-        headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
-        resp = requests.get(url, headers=headers, timeout=10)
-        resp.raise_for_status()
+    for i, address in enumerate(address_variants):
+        print(f'[get_latlon_from_address] 주소 변환 시도 #{i+1}: {address}')
         
-        result = resp.json()
-        if result['documents']:
-            lat = float(result['documents'][0]['y'])
-            lon = float(result['documents'][0]['x'])
-            print(f"[카카오맵 REST API 성공] lat: {lat}, lon: {lon}")
-            _cache[address] = (lat, lon)
-            return lat, lon
-        else:
-            print("[카카오맵 REST API] 주소에 해당하는 좌표를 찾지 못했습니다.")
-            _cache[address] = (None, None)
-            return None, None
+        # 캐시 확인
+        if address in _cache:
+            result = _cache[address]
+            print(f'[get_latlon_from_address] 캐시에서 발견: {result}')
+            return result
+        
+        # 레이트 제한 적용
+        _rate_limit_wait()
+        
+        try:
+            url = f"https://dapi.kakao.com/v2/local/search/address.json?query={quote(address)}"
+            headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
+            print(f'[get_latlon_from_address] API 요청 URL: {url}')
+            resp = requests.get(url, headers=headers, timeout=10)
+            resp.raise_for_status()
             
-    except requests.exceptions.RequestException as e:
-        print(f'[카카오맵 REST API 실패] 요청 오류: {e}')
-        _cache[address] = (None, None)
-    except Exception as e:
-        print(f'[카카오맵 REST API 실패] 기타 오류: {e}')
-        _cache[address] = (None, None)
-        
+            result = resp.json()
+            print(f'[get_latlon_from_address] API 응답: {result}')
+            
+            if result['documents']:
+                lat = float(result['documents'][0]['y'])
+                lon = float(result['documents'][0]['x'])
+                print(f"[카카오맵 REST API 성공] {address} -> lat: {lat}, lon: {lon}")
+                _cache[original_address] = (lat, lon)  # 원래 주소로 캐시
+                return lat, lon
+            else:
+                print(f"[카카오맵 REST API] 주소 '{address}'에 해당하는 좌표를 찾지 못했습니다.")
+                
+        except requests.exceptions.RequestException as e:
+            print(f'[카카오맵 REST API 실패] 요청 오류 for {address}: {e}')
+        except Exception as e:
+            print(f'[카카오맵 REST API 실패] 기타 오류 for {address}: {e}')
+    
+    # 모든 시도 실패
+    print(f'[get_latlon_from_address] 모든 주소 형식 시도 실패: {original_address}')
+    _cache[original_address] = (None, None)
     return None, None
 
 def batch_get_latlon_from_addresses(addresses: List[str]) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
@@ -95,5 +110,14 @@ def batch_get_latlon_from_addresses(addresses: List[str]) -> Dict[str, Tuple[Opt
 def clear_cache():
     """캐시를 초기화하는 함수"""
     global _cache
+    cache_size = len(_cache)
     _cache.clear()
     get_latlon_from_address.cache_clear()
+    print(f'[캐시] 주소 변환 캐시를 초기화했습니다. (삭제된 항목: {cache_size}개)')
+
+def get_cache_info():
+    """캐시 정보 반환"""
+    return {
+        'size': len(_cache),
+        'items': dict(_cache)
+    }

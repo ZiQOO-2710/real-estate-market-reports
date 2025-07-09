@@ -23,7 +23,7 @@ from data_processing import (
     clean_for_json,
     match_with_supabase
 )
-from map_utils import get_latlon_from_address
+from map_utils import get_latlon_from_address, clear_cache
 
 # --- Application Factory ---
 def create_app(config_name='default'):
