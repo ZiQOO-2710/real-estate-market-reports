@@ -590,5 +590,5 @@ def fill_latlon():
     return '<br>'.join(log_lines) + f'<br><br>로그 파일: {log_path}'
 
 if __name__ == '__main__':
-    # 8002번 포트에서 실행 (테스트용)
-    app.run(debug=True, port=8002, host='0.0.0.0')
+    # 8001번 포트에서 실행
+    app.run(debug=True, port=8001, host='0.0.0.0')
