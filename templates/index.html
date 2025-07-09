@@ -6,6 +6,33 @@
     <title>부동산 거래 데이터 분석</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .progress {
+            height: 8px;
+            background-color: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
@@ -16,17 +43,38 @@
                 <h2 class="h5 mb-0">CSV 파일 업로드</h2>
             </div>
             <div class="card-body">
-                <form action="/upload" method="post" enctype="multipart/form-data">
+                <div id="errorAlert" class="alert alert-danger" style="display: none;">
+                    <strong>오류:</strong> <span id="errorMessage"></span>
+                </div>
+                
+                <form action="/upload" method="post" enctype="multipart/form-data" onsubmit="return validateAndShowUploadIndicator(event)">
                     <div class="mb-3">
                         <label for="file" class="form-label">CSV 파일 선택</label>
-                        <input class="form-control" type="file" id="file" name="file" required>
+                        <input class="form-control" type="file" id="file" name="file" accept=".csv" required>
+                        <div class="form-text">CSV 파일만 업로드 가능합니다. (최대 50MB)</div>
                     </div>
-                    <button type="submit" class="btn btn-primary">업로드 및 분석</button>
+                    <button type="submit" class="btn btn-primary" id="uploadButton">
+                        <span id="uploadButtonText">업로드 및 분석</span>
+                        <span id="uploadSpinner" class="spinner-border spinner-border-sm ms-2" style="display: none;" role="status" aria-hidden="true"></span>
+                    </button>
                 </form>
-                <div id="loading" style="display:none; text-align:center; margin-top:20px;">
-                  <div class="spinner-border text-primary" role="status"></div>
-                  <div style="margin-top:10px;">분석 중입니다. 잠시만 기다려주세요...</div>
-                  <div id="timer" style="margin-top:10px; color:gray;">경과 시간: <span id="elapsed">0</span>초</div>
+                
+                <!-- 업로드 로딩 오버레이 -->
+                <div id="uploadLoadingOverlay" class="loading-overlay" style="display: none;">
+                    <div class="loading-content">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <h5 class="mb-2">데이터 업로드 및 분석 중...</h5>
+                        <p class="text-muted">대용량 데이터의 경우 시간이 오래 걸릴 수 있습니다.</p>
+                        <div id="uploadTimer" class="mt-2 text-muted">경과 시간: <span id="uploadElapsed">0</span>초</div>
+                        <div class="progress mt-3" style="width: 400px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                 role="progressbar" 
+                                 style="width: 100%">
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -39,7 +87,8 @@
                 <ol>
                     <li>CSV 파일을 업로드합니다.</li>
                     <li>데이터 분석 결과를 확인합니다.</li>
-                    <li>소재지번을 입력하고 반경(1km 또는 3km)을 선택합니다.</li>
+                    <li>소재지번을 입력하고 반경(1km, 3km, 5km, 10km)을 선택합니다.</li>
+                    <li>면적 범위와 건축년도 조건을 설정합니다.</li>
                     <li>필터링된 결과를 확인하고 필요한 정렬을 수행합니다.</li>
                     <li>결과를 CSV 파일로 다운로드할 수 있습니다.</li>
                 </ol>
@@ -76,5 +125,133 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        let uploadTimer;
+        let uploadStartTime;
+        
+        function showError(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorAlert.style.display = 'block';
+            setTimeout(() => {
+                errorAlert.style.display = 'none';
+            }, 5000);
+        }
+        
+        function validateAndShowUploadIndicator(event) {
+            console.log('validateAndShowUploadIndicator called');
+            
+            // 기존 에러 메시지 숨기기
+            document.getElementById('errorAlert').style.display = 'none';
+            
+            // 파일 선택 검증
+            const fileInput = document.getElementById('file');
+            
+            if (!fileInput.files || fileInput.files.length === 0) {
+                console.log('No file selected');
+                event.preventDefault();
+                showError('CSV 파일을 선택해주세요.');
+                return false;
+            }
+            
+            const file = fileInput.files[0];
+            console.log('File selected:', file.name);
+            
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                console.log('Invalid file type');
+                event.preventDefault();
+                showError('CSV 파일만 업로드 가능합니다.');
+                return false;
+            }
+            
+            // 파일 크기 검증 (50MB 제한)
+            const maxSize = 50 * 1024 * 1024; // 50MB
+            if (file.size > maxSize) {
+                console.log('File too large');
+                event.preventDefault();
+                showError('파일 크기가 너무 큽니다. 최대 50MB까지 업로드 가능합니다.');
+                return false;
+            }
+            
+            console.log('File validation passed, showing indicator');
+            
+            // 버튼 상태 변경
+            const button = document.getElementById('uploadButton');
+            const buttonText = document.getElementById('uploadButtonText');
+            const uploadSpinner = document.getElementById('uploadSpinner');
+            const overlay = document.getElementById('uploadLoadingOverlay');
+            
+            // 버튼 비활성화 및 텍스트 변경
+            button.disabled = true;
+            buttonText.textContent = '업로드 중...';
+            uploadSpinner.style.display = 'inline-block';
+            fileInput.disabled = true;
+            
+            // 오버레이 표시
+            overlay.style.display = 'flex';
+            
+            // 타이머 시작
+            uploadStartTime = Date.now();
+            uploadTimer = setInterval(updateUploadTimer, 1000);
+            
+            return true;
+        }
+        
+        function updateUploadTimer() {
+            const elapsed = Math.floor((Date.now() - uploadStartTime) / 1000);
+            document.getElementById('uploadElapsed').textContent = elapsed;
+        }
+        
+        function hideUploadIndicator() {
+            // 타이머 중지
+            if (uploadTimer) {
+                clearInterval(uploadTimer);
+            }
+            
+            // 버튼 상태 복원
+            const button = document.getElementById('uploadButton');
+            const buttonText = document.getElementById('uploadButtonText');
+            const uploadSpinner = document.getElementById('uploadSpinner');
+            const overlay = document.getElementById('uploadLoadingOverlay');
+            const fileInput = document.getElementById('file');
+            
+            button.disabled = false;
+            buttonText.textContent = '업로드 및 분석';
+            uploadSpinner.style.display = 'none';
+            fileInput.disabled = false;
+            
+            // 오버레이 숨기기
+            overlay.style.display = 'none';
+        }
+        
+        // 페이지 로드 시 로딩 상태 해제
+        window.addEventListener('load', function() {
+            hideUploadIndicator();
+        });
+        
+        // 뒤로가기 시 로딩 상태 해제
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted) {
+                hideUploadIndicator();
+            }
+        });
+        
+        // 폼 제출 시 추가 검증
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.querySelector('form[action="/upload"]');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    console.log('Form submit event triggered');
+                    const fileInput = document.getElementById('file');
+                    if (!fileInput.files || fileInput.files.length === 0) {
+                        e.preventDefault();
+                        showError('CSV 파일을 선택해주세요.');
+                        return false;
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html> 

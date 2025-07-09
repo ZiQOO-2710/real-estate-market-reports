@@ -114,9 +114,23 @@ def get_file_hash(file_path):
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
+        print(f"[UPLOAD] Request files: {request.files}")
+        print(f"[UPLOAD] Request form: {request.form}")
+        
         file = request.files.get('file')
-        if not file or not file.filename or not file.filename.endswith('.csv'):
-            return jsonify({'error': '유효한 CSV 파일을 선택해주세요.'}), 400
+        print(f"[UPLOAD] File object: {file}")
+        
+        if not file:
+            print("[UPLOAD] No file in request")
+            return jsonify({'error': 'CSV 파일을 선택해주세요.'}), 400
+        if not file.filename:
+            print("[UPLOAD] No filename")
+            return jsonify({'error': '파일 이름이 없습니다. 다시 선택해주세요.'}), 400
+        if not file.filename.endswith('.csv'):
+            print(f"[UPLOAD] Invalid file extension: {file.filename}")
+            return jsonify({'error': 'CSV 파일만 업로드 가능합니다. (.csv 확장자 필요)'}), 400
+        
+        print(f"[UPLOAD] File validation passed: {file.filename}")
         
         # 파일 크기 검증
         if file.content_length and file.content_length > app.config['MAX_CONTENT_LENGTH']:
@@ -342,15 +356,21 @@ def show_filtered_results():
                 return val
         for row in data_records:
             for col in columns:
-                # 거래금액만 쉼표, 계약년월은 원본 그대로, 전용면적(㎡)은 소수점 둘째자리까지
+                # 거래금액만 쉼표, 계약년월은 정수로, 전용면적(㎡)은 소수점 둘째자리까지
                 if col == '거래금액' and col in row and (isinstance(row[col], (int, float)) or (isinstance(row[col], str) and row[col].replace(',', '').replace('.', '', 1).isdigit())):
                     row[col] = format_number(row[col])
-                if (col == '전용면적(㎡)' or col == '전용면적(㎡)') and col in row and row[col] is not None and row[col] != '':
+                elif col == '계약년월' and col in row and row[col] is not None and row[col] != '':
+                    try:
+                        # 계약년월은 정수로 변환 (소수점 제거)
+                        row[col] = str(int(float(row[col])))
+                    except Exception:
+                        pass
+                elif (col == '전용면적(㎡)' or col == '전용면적(㎡)') and col in row and row[col] is not None and row[col] != '':
                     try:
                         row[col] = f"{float(row[col]):.2f}"
                     except Exception:
                         pass
-                if col == '전용평' and col in row and row[col] is not None and row[col] != '':
+                elif col == '전용평' and col in row and row[col] is not None and row[col] != '':
                     try:
                         row[col] = f"{float(row[col]):.2f}"
                     except Exception:
