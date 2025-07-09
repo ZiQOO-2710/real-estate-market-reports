@@ -43,11 +43,23 @@
                 <h2 class="h5 mb-0">CSV 파일 업로드</h2>
             </div>
             <div class="card-body">
+                <!-- Flask 플래시 메시지 -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                <strong>{{ '오류:' if category == 'error' else '알림:' }}</strong> {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
                 <div id="errorAlert" class="alert alert-danger" style="display: none;">
                     <strong>오류:</strong> <span id="errorMessage"></span>
                 </div>
                 
-                <form action="/upload" method="post" enctype="multipart/form-data" onsubmit="return validateAndShowUploadIndicator(event)">
+                <form action="/upload" method="post" enctype="multipart/form-data" onsubmit="showUploadIndicator()">
                     <div class="mb-3">
                         <label for="file" class="form-label">CSV 파일 선택</label>
                         <input class="form-control" type="file" id="file" name="file" accept=".csv" required>
@@ -139,63 +151,31 @@
             }, 5000);
         }
         
-        function validateAndShowUploadIndicator(event) {
-            console.log('validateAndShowUploadIndicator called');
+        function showUploadIndicator() {
+            console.log('showUploadIndicator called');
             
             // 기존 에러 메시지 숨기기
             document.getElementById('errorAlert').style.display = 'none';
-            
-            // 파일 선택 검증
-            const fileInput = document.getElementById('file');
-            
-            if (!fileInput.files || fileInput.files.length === 0) {
-                console.log('No file selected');
-                event.preventDefault();
-                showError('CSV 파일을 선택해주세요.');
-                return false;
-            }
-            
-            const file = fileInput.files[0];
-            console.log('File selected:', file.name);
-            
-            if (!file.name.toLowerCase().endsWith('.csv')) {
-                console.log('Invalid file type');
-                event.preventDefault();
-                showError('CSV 파일만 업로드 가능합니다.');
-                return false;
-            }
-            
-            // 파일 크기 검증 (50MB 제한)
-            const maxSize = 50 * 1024 * 1024; // 50MB
-            if (file.size > maxSize) {
-                console.log('File too large');
-                event.preventDefault();
-                showError('파일 크기가 너무 큽니다. 최대 50MB까지 업로드 가능합니다.');
-                return false;
-            }
-            
-            console.log('File validation passed, showing indicator');
             
             // 버튼 상태 변경
             const button = document.getElementById('uploadButton');
             const buttonText = document.getElementById('uploadButtonText');
             const uploadSpinner = document.getElementById('uploadSpinner');
             const overlay = document.getElementById('uploadLoadingOverlay');
+            const fileInput = document.getElementById('file');
             
             // 버튼 비활성화 및 텍스트 변경
-            button.disabled = true;
-            buttonText.textContent = '업로드 중...';
-            uploadSpinner.style.display = 'inline-block';
-            fileInput.disabled = true;
+            if (button) button.disabled = true;
+            if (buttonText) buttonText.textContent = '업로드 중...';
+            if (uploadSpinner) uploadSpinner.style.display = 'inline-block';
+            if (fileInput) fileInput.disabled = true;
             
             // 오버레이 표시
-            overlay.style.display = 'flex';
+            if (overlay) overlay.style.display = 'flex';
             
             // 타이머 시작
             uploadStartTime = Date.now();
             uploadTimer = setInterval(updateUploadTimer, 1000);
-            
-            return true;
         }
         
         function updateUploadTimer() {
@@ -237,21 +217,6 @@
             }
         });
         
-        // 폼 제출 시 추가 검증
-        document.addEventListener('DOMContentLoaded', function() {
-            const form = document.querySelector('form[action="/upload"]');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    console.log('Form submit event triggered');
-                    const fileInput = document.getElementById('file');
-                    if (!fileInput.files || fileInput.files.length === 0) {
-                        e.preventDefault();
-                        showError('CSV 파일을 선택해주세요.');
-                        return false;
-                    }
-                });
-            }
-        });
     </script>
 </body>
 </html> 

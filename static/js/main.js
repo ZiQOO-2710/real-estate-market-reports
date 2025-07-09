@@ -33,17 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const uploadForm = document.querySelector('form[action="/upload"]');
-    if (uploadForm) {
-        uploadForm.addEventListener('submit', function(e) {
-            const fileInput = document.getElementById('file');
-            if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-                e.preventDefault();
-                alert('CSV 파일을 선택하세요!');
-                return false;
-            }
-        });
-    }
 });
 
 // 숫자 데이터 셀에 클래스 적용

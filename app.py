@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_file, session
+from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
 from supabase import create_client, Client
 import pandas as pd
 import numpy as np
@@ -122,19 +122,23 @@ def upload_file():
         
         if not file:
             print("[UPLOAD] No file in request")
-            return jsonify({'error': 'CSV 파일을 선택해주세요.'}), 400
+            flash('CSV 파일을 선택해주세요.', 'error')
+            return redirect(url_for('index'))
         if not file.filename:
             print("[UPLOAD] No filename")
-            return jsonify({'error': '파일 이름이 없습니다. 다시 선택해주세요.'}), 400
+            flash('파일 이름이 없습니다. 다시 선택해주세요.', 'error')
+            return redirect(url_for('index'))
         if not file.filename.endswith('.csv'):
             print(f"[UPLOAD] Invalid file extension: {file.filename}")
-            return jsonify({'error': 'CSV 파일만 업로드 가능합니다. (.csv 확장자 필요)'}), 400
+            flash('CSV 파일만 업로드 가능합니다. (.csv 확장자 필요)', 'error')
+            return redirect(url_for('index'))
         
         print(f"[UPLOAD] File validation passed: {file.filename}")
         
         # 파일 크기 검증
-        if file.content_length and file.content_length > app.config['MAX_CONTENT_LENGTH']:
-            return jsonify({'error': f'파일 크기가 너무 큽니다. 최대 {app.config["MAX_CONTENT_LENGTH"]//1024//1024}MB까지 업로드 가능합니다.'}), 400
+        if file.content_length and file.content_length > app.config.get('MAX_CONTENT_LENGTH', 50*1024*1024):
+            flash(f'파일 크기가 너무 큽니다. 최대 50MB까지 업로드 가능합니다.', 'error')
+            return redirect(url_for('index'))
         
         # 전용면적 구간 선택값 받기
         area_range = request.form.get('area_range', 'all')
@@ -195,19 +199,24 @@ def upload_file():
         return render_template('analysis.html', stats=stats, columns=columns, analyzed_file=filename)
     except FileNotFoundError as e:
         print(f"[Upload Error - File Not Found] {e}")
-        return jsonify({'error': '파일을 찾을 수 없습니다.'}), 404
+        flash('파일을 찾을 수 없습니다.', 'error')
+        return redirect(url_for('index'))
     except pd.errors.EmptyDataError as e:
         print(f"[Upload Error - Empty Data] {e}")
-        return jsonify({'error': '빈 파일이거나 유효한 데이터가 없습니다.'}), 400
+        flash('빈 파일이거나 유효한 데이터가 없습니다.', 'error')
+        return redirect(url_for('index'))
     except pd.errors.ParserError as e:
         print(f"[Upload Error - Parser Error] {e}")
-        return jsonify({'error': 'CSV 파일 형식이 올바르지 않습니다.'}), 400
+        flash('CSV 파일 형식이 올바르지 않습니다.', 'error')
+        return redirect(url_for('index'))
     except MemoryError as e:
         print(f"[Upload Error - Memory Error] {e}")
-        return jsonify({'error': '파일이 너무 커서 처리할 수 없습니다.'}), 413
+        flash('파일이 너무 커서 처리할 수 없습니다.', 'error')
+        return redirect(url_for('index'))
     except Exception as e:
         print(f"[Upload Error] {e}")
-        return jsonify({'error': f'파일 처리 중 오류가 발생했습니다: {str(e)}'}), 500
+        flash(f'파일 처리 중 오류가 발생했습니다: {str(e)}', 'error')
+        return redirect(url_for('index'))
 
 @app.route('/filter', methods=['POST'])
 def filter_data():
@@ -565,5 +574,5 @@ def fill_latlon():
     return '<br>'.join(log_lines) + f'<br><br>로그 파일: {log_path}'
 
 if __name__ == '__main__':
-    # 항상 8001번 포트에서 실행
-    app.run(debug=True, port=8001, host='0.0.0.0')
+    # 8002번 포트에서 실행 (테스트용)
+    app.run(debug=True, port=8002, host='0.0.0.0')
