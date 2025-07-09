@@ -10,7 +10,7 @@ class Config:
     """기본 설정 클래스"""
     SECRET_KEY = os.environ.get('FLASK_SECRET_KEY', 'a_default_secret_key')
     UPLOAD_FOLDER = 'uploads'
-    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
     
     # Supabase 설정
     SUPABASE_URL = os.environ.get('SUPABASE_URL')

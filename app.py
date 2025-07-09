@@ -53,6 +53,12 @@ def create_app(config_name='default'):
     # 애플리케이션 컨텍스트에 클라이언트 저장
     app.supabase = supabase
     
+    # 파일 크기 초과 오류 핸들러
+    @app.errorhandler(413)
+    def request_entity_too_large(error):
+        flash('파일 크기가 너무 큽니다. 최대 50MB까지 업로드 가능합니다.', 'error')
+        return redirect(url_for('index'))
+    
     return app
 
 # --- 애플리케이션 생성 ---
@@ -80,6 +86,8 @@ def insert_new_apartments_to_supabase(df, supabase):
 
 @app.route('/')
 def index():
+    # 템플릿 렌더링 전에 플래시 메시지 확인
+    print(f"[DEBUG] Flash messages: {session.get('_flashes', [])}")
     return render_template('index.html')
 
 @app.route('/analysis')
@@ -114,20 +122,28 @@ def get_file_hash(file_path):
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
+        print(f"[UPLOAD] === 업로드 요청 디버깅 시작 ===")
+        print(f"[UPLOAD] Request method: {request.method}")
+        print(f"[UPLOAD] Request content type: {request.content_type}")
+        print(f"[UPLOAD] Request files keys: {list(request.files.keys())}")
         print(f"[UPLOAD] Request files: {request.files}")
         print(f"[UPLOAD] Request form: {request.form}")
         
-        file = request.files.get('file')
-        print(f"[UPLOAD] File object: {file}")
+        # 'file' 키가 있는지 확인
+        if 'file' not in request.files:
+            print("[UPLOAD] 'file' key not in request.files")
+            flash('파일 업로드 요청에 파일이 포함되지 않았습니다.', 'error')
+            return redirect(url_for('index'))
         
-        if not file:
-            print("[UPLOAD] No file in request")
+        file = request.files['file']
+        print(f"[UPLOAD] File object: {file}")
+        print(f"[UPLOAD] File filename: {getattr(file, 'filename', 'NO_FILENAME')}")
+        
+        if not file or not file.filename:
+            print("[UPLOAD] No file or no filename")
             flash('CSV 파일을 선택해주세요.', 'error')
             return redirect(url_for('index'))
-        if not file.filename:
-            print("[UPLOAD] No filename")
-            flash('파일 이름이 없습니다. 다시 선택해주세요.', 'error')
-            return redirect(url_for('index'))
+            
         if not file.filename.endswith('.csv'):
             print(f"[UPLOAD] Invalid file extension: {file.filename}")
             flash('CSV 파일만 업로드 가능합니다. (.csv 확장자 필요)', 'error')
