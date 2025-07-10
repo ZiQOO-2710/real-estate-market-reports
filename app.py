@@ -261,6 +261,15 @@ def show_filtered_results():
     sort_col = filter_params.get('sort_col')
     sort_order = filter_params.get('sort_order', 'desc')
     
+    print(f"[DEBUG] 필터 파라미터 확인:")
+    print(f"  - address: '{address}'")
+    print(f"  - radius_km: {radius_km}")
+    print(f"  - area_range: {area_range}")
+    print(f"  - sort_col: {sort_col}")
+    print(f"  - sort_order: {sort_order}")
+    print(f"  - session datafile: {session.get('datafile', 'NOT_FOUND')}")
+    print(f"  - filter_params: {filter_params}")
+    
     # 페이지네이션 파라미터
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))  # 기본 20개씩
@@ -269,13 +278,25 @@ def show_filtered_results():
     session['area_range'] = area_range
 
     if not address:
+        print(f"[ERROR] 주소가 비어있음: '{address}'")
         return render_template('map.html', error='주소를 입력해주세요.', data=[], columns=[], center_lat=None, center_lon=None, radius=radius_m)
 
     if 'datafile' not in session:
-        center_lat, center_lon = get_latlon_from_address(address)
-        if center_lat is None or center_lon is None:
-            return render_template('map.html', error='입력하신 주소로 좌표를 찾을 수 없습니다. 주소를 더 정확히 입력해 주세요.', data=[], columns=[], center_lat=None, center_lon=None, radius=radius_m)
-        return render_template('map.html', data=[], columns=[], message='검색 결과 없음', center_lat=center_lat, center_lon=center_lon, radius=radius_m)
+        print(f"[ERROR] 세션에 datafile이 없음 - 업로드된 파일이 없거나 세션 만료")
+        print(f"[INFO] 자동으로 가장 최근 분석 파일 사용 시도")
+        
+        # 가장 최근 분석 파일 찾기
+        import glob
+        analysis_files = glob.glob('uploads/*_분석완료.csv')
+        if analysis_files:
+            latest_file = max(analysis_files, key=os.path.getmtime)
+            session['datafile'] = os.path.basename(latest_file)
+            print(f"[INFO] 자동 복구된 세션 파일: {session['datafile']}")
+        else:
+            center_lat, center_lon = get_latlon_from_address(address)
+            if center_lat is None or center_lon is None:
+                return render_template('map.html', error='입력하신 주소로 좌표를 찾을 수 없습니다. 주소를 더 정확히 입력해 주세요.', data=[], columns=[], center_lat=None, center_lon=None, radius=radius_m)
+            return render_template('map.html', data=[], columns=[], message='검색 결과 없음 - 먼저 CSV 파일을 업로드해주세요.', center_lat=center_lat, center_lon=center_lon, radius=radius_m)
 
     try:
         temp_filename = session['datafile']
@@ -284,8 +305,12 @@ def show_filtered_results():
         df = pd.read_csv(temp_path, encoding='utf-8-sig')
         columns = df.columns.tolist()
 
+        print(f"[DEBUG] 주소 좌표 변환 요청: '{address}'")
         center_lat, center_lon = get_latlon_from_address(address)
+        print(f"[DEBUG] 좌표 변환 결과: lat={center_lat}, lon={center_lon}")
+        
         if center_lat is None or center_lon is None:
+            print(f"[ERROR] 좌표 변환 실패 - 주소: '{address}'")
             return render_template('map.html', error='입력하신 주소로 좌표를 찾을 수 없습니다. 주소를 더 정확히 입력해 주세요.', data=[], columns=columns, center_lat=None, center_lon=None, radius=radius_m)
 
         # 번지 컬럼 정규화: 숫자+하이픈만 남기고 문자열로 변환
@@ -381,8 +406,8 @@ def show_filtered_results():
                 return val
         for row in data_records:
             for col in columns:
-                # 거래금액만 쉼표, 계약년월은 정수로, 전용면적(㎡)은 소수점 둘째자리까지
-                if col == '거래금액' and col in row and (isinstance(row[col], (int, float)) or (isinstance(row[col], str) and row[col].replace(',', '').replace('.', '', 1).isdigit())):
+                # 금액, 보증금, 월세 등 '금액'이 포함된 모든 숫자 컬럼에 쉼표 추가
+                if ('금액' in col or '보증금' in col or '월세' in col) and col in row and (isinstance(row[col], (int, float)) or (isinstance(row[col], str) and str(row[col]).replace(',', '').replace('.', '', 1).isdigit())):
                     row[col] = format_number(row[col])
                 elif col == '계약년월' and col in row and row[col] is not None and row[col] != '':
                     try:
@@ -398,6 +423,26 @@ def show_filtered_results():
                 elif col == '전용평' and col in row and row[col] is not None and row[col] != '':
                     try:
                         row[col] = f"{float(row[col]):.2f}"
+                    except Exception:
+                        pass
+                elif col == '층' and col in row and row[col] is not None and row[col] != '':
+                    try:
+                        row[col] = str(int(float(row[col])))  # 정수로 변환
+                    except Exception:
+                        pass
+                elif col == '건축년도' and col in row and row[col] is not None and row[col] != '':
+                    try:
+                        row[col] = str(int(float(row[col])))  # 정수로 변환
+                    except Exception:
+                        pass
+                elif col == '전용평당' and col in row and row[col] is not None and row[col] != '':
+                    try:
+                        row[col] = f"{float(row[col]):,.2f}"  # 쉼표와 소수점 둘째자리
+                    except Exception:
+                        pass
+                elif col == '공급평당' and col in row and row[col] is not None and row[col] != '':
+                    try:
+                        row[col] = f"{float(row[col]):,.2f}"  # 쉼표와 소수점 둘째자리
                     except Exception:
                         pass
         data_records = clean_for_json(data_records)
@@ -425,8 +470,8 @@ def show_filtered_results():
             'count': total_count,
             'no_data': total_count == 0,
             'message': '필터 조건에 맞는 데이터가 없습니다.' if total_count == 0 else '',
-            'center_lat': float(center_lat) if center_lat else 36.815,
-            'center_lon': float(center_lon) if center_lon else 127.1138,
+            'center_lat': float(center_lat) if center_lat else 37.5665,  # 서울시청 좌표
+            'center_lon': float(center_lon) if center_lon else 126.978,
             'radius': radius_m,
             'first_lat': float(data_records[0].get('위도', 0)) if data_records else None,
             'first_lon': float(data_records[0].get('경도', 0)) if data_records else None,
@@ -468,59 +513,96 @@ def show_filtered_results():
 
 @app.route('/download', methods=['GET'])
 def download_csv():
-    if 'datafile' not in session:
-        return "다운로드할 데이터가 없습니다.", 404
+    if 'datafile' not in session or 'filter_params' not in session:
+        flash('다운로드할 데이터가 없거나 필터 조건이 설정되지 않았습니다.', 'error')
+        return redirect(request.referrer or url_for('index'))
 
     temp_filename = session['datafile']
     temp_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
 
     if not os.path.exists(temp_path):
-        return "파일을 찾을 수 없습니다.", 404
+        flash('분석 데이터 파일을 찾을 수 없습니다.', 'error')
+        return redirect(url_for('index'))
 
-    # area_range 및 build_year 세션값에 따라 필터링해서 다운로드
-    area_range = session.get('area_range', 'all')
-    build_year = session.get('build_year', 'all')
-    df = pd.read_csv(temp_path, encoding='utf-8-sig')
-    
-    # 전용면적 필터링
-    area_col = None
-    for col in ['전용면적(㎡)', '전용면적(\u33A1)']:
-        if col in df.columns:
-            area_col = col
-            break
-    if area_col:
-        if area_range == 'le60':
-            df = df[df[area_col] <= 60]
-        elif area_range == 'gt60le85':
-            df = df[(df[area_col] > 60) & (df[area_col] <= 85)]
-        elif area_range == 'gt85le102':
-            df = df[(df[area_col] > 85) & (df[area_col] <= 102)]
-        elif area_range == 'gt102le135':
-            df = df[(df[area_col] > 102) & (df[area_col] <= 135)]
-        elif area_range == 'gt135':
-            df = df[df[area_col] > 135]
-        # 'all'은 필터링 없음
-    
-    # 건축년도 필터링
-    if build_year != 'all' and '건축년도' in df.columns:
-        current_year = datetime.now().year
-        df['건축년도'] = pd.to_numeric(df['건축년도'], errors='coerce')
-        df = df.dropna(subset=['건축년도'])
+    try:
+        df = pd.read_csv(temp_path, encoding='utf-8-sig')
         
-        if build_year == 'recent5':
-            df = df[df['건축년도'] >= (current_year - 5)]
-        elif build_year == 'recent10':
-            df = df[df['건축년도'] >= (current_year - 10)]
-        elif build_year == 'recent15':
-            df = df[df['건축년도'] >= (current_year - 15)]
-        elif build_year == 'over15':
-            df = df[df['건축년도'] < (current_year - 15)]
-    # 임시 파일로 저장해서 다운로드
-    from io import BytesIO
-    output = BytesIO()
-    df.to_csv(output, index=False, encoding='utf-8-sig')
-    output.seek(0)
-    return send_file(output, as_attachment=True, download_name=f'analyzed_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv', mimetype='text/csv')
+        # 세션에서 모든 필터 파라미터 가져오기
+        filter_params = session.get('filter_params', {})
+        address = filter_params.get('address')
+        radius_km = filter_params.get('radius', 10.0)
+        area_range = filter_params.get('area_range', 'all')
+        build_year = filter_params.get('build_year', 'all')
+
+        if not address:
+            flash('다운로드를 위해 주소를 먼저 설정해야 합니다.', 'error')
+            return redirect(request.referrer or url_for('index'))
+
+        # --- show_filtered_results와 동일한 필터링 로직 적용 ---
+        
+        # 1. 주소 -> 좌표 변환
+        center_lat, center_lon = get_latlon_from_address(address)
+        if center_lat is None or center_lon is None:
+            flash('주소의 좌표를 찾을 수 없어 다운로드할 수 없습니다.', 'error')
+            return redirect(request.referrer or url_for('index'))
+
+        # 2. 전용면적 필터링
+        area_col = next((col for col in ['전용면적(㎡)', '전용면적(\u33A1)'] if col in df.columns), None)
+        if area_col:
+            df[area_col] = pd.to_numeric(df[area_col], errors='coerce')
+            if area_range == 'le60':
+                df = df[df[area_col] <= 60]
+            elif area_range == 'gt60le85':
+                df = df[(df[area_col] > 60) & (df[area_col] <= 85)]
+            elif area_range == 'gt85le102':
+                df = df[(df[area_col] > 85) & (df[area_col] <= 102)]
+            elif area_range == 'gt102le135':
+                df = df[(df[area_col] > 102) & (df[area_col] <= 135)]
+            elif area_range == 'gt135':
+                df = df[df[area_col] > 135]
+
+        # 3. 건축년도 필터링
+        if build_year != 'all' and '건축년도' in df.columns:
+            current_year = datetime.now().year
+            df['건축년도'] = pd.to_numeric(df['건축년도'], errors='coerce')
+            df = df.dropna(subset=['건축년도'])
+            
+            if build_year == 'recent5':
+                df = df[df['건축년도'] >= (current_year - 5)]
+            elif build_year == 'recent10':
+                df = df[df['건축년도'] >= (current_year - 10)]
+            elif build_year == 'recent15':
+                df = df[df['건축년도'] >= (current_year - 15)]
+            elif build_year == 'over15':
+                df = df[df['건축년도'] < (current_year - 15)]
+        
+        # 4. 거리 필터링
+        df['위도'] = pd.to_numeric(df['위도'], errors='coerce')
+        df['경도'] = pd.to_numeric(df['경도'], errors='coerce')
+        df = df.dropna(subset=['위도', '경도'])
+        
+        from geopy.distance import geodesic
+        if not df.empty:
+            df['중심점과의거리(km)'] = df.apply(
+                lambda row: geodesic((center_lat, center_lon), (row['위도'], row['경도'])).kilometers,
+                axis=1
+            )
+            df = df[df['중심점과의거리(km)'] <= radius_km].copy()
+        else:
+            df['중심점과의거리(km)'] = np.nan
+
+        # 다운로드 파일 생성
+        output = io.BytesIO()
+        df.to_csv(output, index=False, encoding='utf-8-sig')
+        output.seek(0)
+        
+        download_name = f'filtered_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        return send_file(output, as_attachment=True, download_name=download_name, mimetype='text/csv')
+
+    except Exception as e:
+        print(f"[Download Error] {e}")
+        flash(f'다운로드 중 오류가 발생했습니다: {e}', 'error')
+        return redirect(request.referrer or url_for('index'))
 
 @app.route('/fill_latlon', methods=['GET'])
 def fill_latlon():
@@ -591,4 +673,4 @@ def fill_latlon():
 
 if __name__ == '__main__':
     # 8001번 포트에서 실행
-    app.run(debug=True, port=8001, host='0.0.0.0')
+    app.run(debug=True, port=8004, host='0.0.0.0')

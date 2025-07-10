@@ -114,7 +114,16 @@
                         <div class="col-md-12 mb-3">
                             <label for="address" class="form-label">소재지번 입력</label>
                             <input type="text" class="form-control" id="address" name="address" 
-                                placeholder="예: 충청남도 천안시 동남구 문화동 179" required>
+                                placeholder="예: 서초동 1326-17 (현재 데이터에 맞는 주소 입력)" required>
+                            <div class="form-text">
+                                <strong>현재 데이터:</strong> 서울특별시 서초구 서초동 지역 <br>
+                                <strong>추천 주소:</strong> "서초동 1326-17" 또는 "서울 서초구 서초동"
+                            </div>
+                            <div class="mt-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="fillAddress('서초동 1326-17')">서초동 1326-17</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="fillAddress('서울 서초구 서초동')">서울 서초구 서초동</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="fillAddress('인천 중구 중산동')">인천 중구 중산동</button>
+                            </div>
                         </div>
                     </div>
                     
@@ -195,6 +204,11 @@
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
+        // 주소 자동 입력 함수
+        function fillAddress(address) {
+            document.getElementById('address').value = address;
+        }
+        
         function showLoadingIndicator() {
             // 버튼 텍스트 변경 및 스피너 표시
             const button = document.getElementById('filterButton');
@@ -210,11 +224,13 @@
             // 오버레이 표시
             overlay.style.display = 'flex';
             
-            // 폼 input들 비활성화
+            // 폼 input들을 비활성화하지 않음 (값 전송을 위해)
+            /*
             const formElements = document.querySelectorAll('#address, #radius, #area_range, #build_year');
             formElements.forEach(element => {
                 element.disabled = true;
             });
+            */
         }
         
         // 페이지 로드 시 로딩 상태 해제 (뒤로가기 등으로 돌아온 경우)

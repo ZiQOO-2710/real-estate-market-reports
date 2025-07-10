@@ -11,6 +11,39 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         #map { height: 400px; margin-bottom: 2rem; border-radius: 10px; }
+        
+        /* 검색 결과 테이블 스타일 */
+        #resultTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+        
+        /* 컬럼별 너비 고정 */
+        #resultTable th:nth-child(1), #resultTable td:nth-child(1) { width: 12%; } /* 시군구 */
+        #resultTable th:nth-child(2), #resultTable td:nth-child(2) { width: 8%; }  /* 번지 */
+        #resultTable th:nth-child(3), #resultTable td:nth-child(3) { width: 15%; } /* 단지명 */
+        #resultTable th:nth-child(4), #resultTable td:nth-child(4) { width: 8%; }  /* 전용면적 */
+        #resultTable th:nth-child(5), #resultTable td:nth-child(5) { width: 8%; }  /* 계약년월 */
+        #resultTable th:nth-child(6), #resultTable td:nth-child(6) { width: 5%; }  /* 층 */
+        #resultTable th:nth-child(7), #resultTable td:nth-child(7) { width: 10%; } /* 거래금액 */
+        #resultTable th:nth-child(8), #resultTable td:nth-child(8) { width: 10%; } /* 전용평당 */
+        #resultTable th:nth-child(9), #resultTable td:nth-child(9) { width: 10%; } /* 공급평당 */
+        #resultTable th:nth-child(10), #resultTable td:nth-child(10) { width: 8%; } /* 거리 */
+        
+        /* 단지명 컬럼만 텍스트 오버플로우 처리 */
+        #resultTable td:nth-child(3) {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* 시군구 컬럼은 앞부분이 잘리고 뒷부분이 보이도록 */
+        #resultTable td:nth-child(1) {
+            white-space: nowrap;
+            overflow: hidden;
+            direction: rtl;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -69,8 +102,9 @@
                     <table class="table table-striped table-hover" id="resultTable">
                         <thead>
                             <tr>
-                                {% for col in columns %}
-                                {% if col not in ['위도', '경도', '중심점과의거리', '공용평당'] %}
+                                {% set display_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'] %}
+                                {% for col in display_columns %}
+                                {% if col in columns %}
                                 <th>
                                     {{ col }}
                                     <div class="btn-group btn-group-sm sort-buttons" role="group">
@@ -86,15 +120,28 @@
                                 </th>
                                 {% endif %}
                                 {% endfor %}
-                                <th>거리(중심점 기준, m)</th>
+                                <th>
+                                    거리(중심점 기준, m)
+                                    <div class="btn-group btn-group-sm sort-buttons" role="group">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="sortTable('중심점과의거리', 'asc')" title="오름차순 정렬">
+                                            <i class="bi bi-sort-up"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                                            onclick="sortTable('중심점과의거리', 'desc')" title="내림차순 정렬">
+                                            <i class="bi bi-sort-down"></i>
+                                        </button>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in data %}
                             <tr>
-                                {% for col in columns %}
-                                {% if col not in ['위도', '경도', '중심점과의거리', '공용평당'] %}
-                                <td>
+                                {% set display_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'] %}
+                                {% for col in display_columns %}
+                                {% if col in columns %}
+                                <td style="text-align: right;">
                                     {% if row[col] is none or row[col]|string == 'nan' or row[col] != row[col] %}
                                         -
                                     {% else %}
@@ -103,7 +150,7 @@
                                 </td>
                                 {% endif %}
                                 {% endfor %}
-                                <td>{{ (row.get('중심점과의거리', 0) * 1000)|round(0)|int if row.get('중심점과의거리') and row.get('중심점과의거리') != 'nan' else '' }}</td>
+                                <td style="text-align: right;">{{ (row.get('중심점과의거리', 0) * 1000)|round(0)|int if row.get('중심점과의거리') and row.get('중심점과의거리') != 'nan' else '' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -224,67 +271,72 @@
     <!-- Navigation Helper -->
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <script>
-        // 지도 데이터 준비
-        const centerLat = {{ center_lat if center_lat is not none else 37.5665 }};  // 서울시청 좌표
-        const centerLon = {{ center_lon if center_lon is not none else 126.978 }};
-        const radius = {{ (data[0].get('중심점과의거리', 1) if data else 1) }} * 1000; // m
-        
-        console.log(`[MAP DEBUG] centerLat: ${centerLat}, centerLon: ${centerLon}`);
-        console.log(`[MAP DEBUG] Original center_lat: {{ center_lat }}, center_lon: {{ center_lon }}`);
-        const aptList = [
-            {% for row in data %}
-            {
-                name: `{{ row.get('단지명', '')|e }}`,
-                lat: {{ row.get('위도', 0) }},
-                lon: {{ row.get('경도', 0) }},
-                distance: {{ (row.get('중심점과의거리', 0) * 1000)|round(0)|int if row.get('중심점과의거리') else 0 }}
-            },
-            {% endfor %}
-        ];
+        function initMap() {
+            // 지도 데이터 준비
+            let centerLat = {{ center_lat|tojson }};
+            let centerLon = {{ center_lon|tojson }};
+            
+            console.log(`[MAP DEBUG] centerLat: ${centerLat}, centerLon: ${centerLon}`);
+            console.log(`[MAP DEBUG] Original center_lat: {{ center_lat }}, center_lon: {{ center_lon }}`);
+            console.log(`[MAP DEBUG] Type check - centerLat type: ${typeof centerLat}, centerLon type: ${typeof centerLon}`);
+            console.log(`[MAP DEBUG] Data length: {{ data|length }}`);
+            
+            const aptList = {{ data|tojson }};
 
-        // 지도 초기화
-        console.log(`[MAP DEBUG] 지도 초기화 - 중심 좌표: ${centerLat}, ${centerLon}`);
-        
-        // 좌표가 유효한지 확인
-        if (isNaN(centerLat) || isNaN(centerLon)) {
-            console.error('[MAP ERROR] 잘못된 좌표값:', centerLat, centerLon);
-            centerLat = 37.5665;  // 서울시청 기본값
-            centerLon = 126.978;
+            // 지도 초기화
+            console.log(`[MAP DEBUG] 지도 초기화 - 중심 좌표: ${centerLat}, ${centerLon}`);
+            console.log(`[MAP DEBUG] aptList length: ${aptList.length}`);
+            
+            // 좌표 유효성 검증
+            if (isNaN(centerLat) || isNaN(centerLon) || centerLat === null || centerLon === null) {
+                console.error(`[MAP ERROR] 유효하지 않은 좌표: lat=${centerLat}, lon=${centerLon}`);
+                
+                if (aptList.length > 0 && aptList[0]['위도'] && aptList[0]['경도']) {
+                    centerLat = parseFloat(aptList[0]['위도']);
+                    centerLon = parseFloat(aptList[0]['경도']);
+                    console.log(`[MAP INFO] 첫 번째 아파트 좌표로 대체: lat=${centerLat}, lon=${centerLon}`);
+                } else {
+                    document.getElementById('map').innerHTML = '<div class="alert alert-danger p-4"><strong>지도 표시 불가</strong><br>중심 좌표를 찾을 수 없고, 목록에도 유효한 좌표가 없어 지도를 표시할 수 없습니다.</div>';
+                    return;
+                }
+            }
+            
+            if (isNaN(centerLat) || isNaN(centerLon)) {
+                console.error('[MAP ERROR] 최종 좌표값도 유효하지 않음:', centerLat, centerLon);
+                document.getElementById('map').innerHTML = '<div class="alert alert-danger p-4"><strong>지도 표시 불가</strong><br>좌표값이 올바르지 않습니다.</div>';
+                return;
+            }
+            
+            const map = L.map('map').setView([centerLat, centerLon], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+
+            // 중심점 표시
+            {% if center_lat is not none and center_lon is not none %}
+            L.marker([centerLat, centerLon]).addTo(map).bindPopup('<b>중심점(입력 주소)</b>').openPopup();
+            L.circle([centerLat, centerLon], {
+                color: '#007bff',
+                fillColor: '#cce5ff',
+                fillOpacity: 0.3,
+                radius: {{ session.get('filter_params', {}).get('radius', 1)|float * 1000 }}
+            }).addTo(map);
+            {% else %}
+            L.popup().setLatLng([centerLat, centerLon]).setContent('<b>주소 변환 실패</b><br>기본 위치를 표시합니다.').openOn(map);
+            {% endif %}
+
+            // 단지 마커
+            aptList.forEach(function(apt) {
+                if (apt['위도'] && apt['경도']) {
+                    const marker = L.marker([apt['위도'], apt['경도']]).addTo(map);
+                    marker.bindPopup(`<b>${apt['단지명']}</b><br>거래금액: ${apt['거래금액']}만원`);
+                }
+            });
         }
         
-        const map = L.map('map').setView([centerLat, centerLon], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        // 중심점 표시 (실제 좌표가 있을 때만)
-        {% if center_lat is not none and center_lon is not none %}
-        const centerMarker = L.marker([centerLat, centerLon]).addTo(map);
-        centerMarker.bindPopup('<b>중심점(입력 주소)</b>').openPopup();
-
-        // 반경 원
-        L.circle([centerLat, centerLon], {
-            color: '#007bff',
-            fillColor: '#cce5ff',
-            fillOpacity: 0.3,
-            radius: {{ session.get('filter_params', {}).get('radius', 1)|float * 1000 }}
-        }).addTo(map);
-        {% else %}
-        // 주소 변환 실패 시 알림
-        L.popup()
-            .setLatLng([centerLat, centerLon])
-            .setContent('<b>주소 변환 실패</b><br>입력한 주소의 좌표를 찾을 수 없어 기본 위치(서울)를 표시합니다.')
-            .openOn(map);
-        {% endif %}
-
-        // 단지 마커
-        aptList.forEach(function(apt) {
-            if (apt.lat && apt.lon) {
-                const marker = L.marker([apt.lat, apt.lon]).addTo(map);
-                marker.bindPopup(`<b>${apt.name}</b><br>중심점까지 거리: ${apt.distance}m`);
-            }
-        });
+        // DOM이 완전히 로드된 후 지도 초기화 함수를 실행합니다.
+        document.addEventListener('DOMContentLoaded', initMap);
     </script>
     <script>
         function sortTable(column, order) {
@@ -317,22 +369,19 @@
         function updateTableWithData(data) {
             const tbody = document.querySelector('#resultTable tbody');
             tbody.innerHTML = '';
-            const columns = [];
-            document.querySelectorAll('#resultTable thead th').forEach(th => {
-                const colName = th.textContent.trim().split('\n')[0].trim();
-                columns.push(colName);
-            });
+            const displayColumns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'];
+            
             data.forEach(row => {
                 const tr = document.createElement('tr');
-                columns.forEach(col => {
-                    if (!['위도', '경도', '중심점과의거리', '거리(중심점 기준, m)'].includes(col)) {
-                        const td = document.createElement('td');
-                        td.textContent = (row[col] === null || row[col] === undefined || row[col] === 'nan') ? '' : row[col];
-                        tr.appendChild(td);
-                    }
+                displayColumns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.style.textAlign = 'right';
+                    td.textContent = (row[col] === null || row[col] === undefined || row[col] === 'nan') ? '-' : row[col];
+                    tr.appendChild(td);
                 });
                 // 거리 컬럼 추가
                 const tdDist = document.createElement('td');
+                tdDist.style.textAlign = 'right';
                 const distance = row['중심점과의거리'];
                 tdDist.textContent = (distance === null || distance === undefined || distance === 'nan' || isNaN(distance)) ? '' : Math.round(distance * 1000);
                 tr.appendChild(tdDist);

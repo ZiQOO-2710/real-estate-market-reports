@@ -62,11 +62,31 @@
     <div id="map"></div>
     <script>
         var data = {{ data|tojson|safe }};
-        var centerLat = {{ center_lat if center_lat else 'null' }};
-        var centerLon = {{ center_lon if center_lon else 'null' }};
+        var centerLat = {{ center_lat if center_lat else 37.5665 }};
+        var centerLon = {{ center_lon if center_lon else 126.978 }};
         var radius = {{ radius if radius else 0 }};
-        console.log('centerLat:', centerLat, 'centerLon:', centerLon);
-        if (centerLat && centerLon) {
+        
+        console.log('[MAP DEBUG] Original center_lat: {{ center_lat }}, center_lon: {{ center_lon }}');
+        console.log('[MAP DEBUG] centerLat:', centerLat, 'centerLon:', centerLon, 'type:', typeof centerLat, typeof centerLon);
+        console.log('[MAP DEBUG] Data length:', data.length);
+        
+        // 좌표 유효성 검증
+        if (isNaN(centerLat) || isNaN(centerLon) || centerLat === null || centerLon === null) {
+            console.error('[MAP ERROR] 유효하지 않은 좌표:', centerLat, centerLon);
+            
+            // 데이터가 있으면 첫 번째 아파트 좌표를 중심으로 사용
+            if (data.length > 0 && data[0]['위도'] && data[0]['경도']) {
+                centerLat = parseFloat(data[0]['위도']);
+                centerLon = parseFloat(data[0]['경도']);
+                console.log('[MAP INFO] 첫 번째 아파트 좌표로 대체:', centerLat, centerLon);
+            } else {
+                centerLat = 37.5665;  // 서울시청 기본값
+                centerLon = 126.978;
+                console.log('[MAP INFO] 기본 좌표 사용:', centerLat, centerLon);
+            }
+        }
+        
+        if (centerLat && centerLon && !isNaN(centerLat) && !isNaN(centerLon)) {
             var map = L.map('map').setView([centerLat, centerLon], 15);
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
@@ -105,7 +125,15 @@
                 }
             });
         } else {
-            document.getElementById('map').innerHTML = '<div style="color:gray; padding:40px; text-align:center;">위도/경도 정보가 없어 지도를 표시할 수 없습니다.</div>';
+            console.error('[MAP ERROR] 지도 초기화 실패 - 유효한 좌표가 없음');
+            document.getElementById('map').innerHTML = `
+                <div style="padding: 20px; text-align: center; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+                    <h4>🗺️ 지도를 표시할 수 없습니다</h4>
+                    <p><strong>좌표 정보:</strong> lat=${centerLat}, lon=${centerLon}</p>
+                    <p>올바른 주소를 입력했는지 확인해주세요.</p>
+                    <p><small>예: "서초동 1326-17" 또는 "서울 서초구 서초동"</small></p>
+                </div>
+            `;
         }
     </script>
     <form id="filterForm" action="/filter" method="post">

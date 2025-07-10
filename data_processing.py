@@ -70,6 +70,48 @@ def process_uploaded_csv(file_path, center_lat=None, center_lon=None):
         # 메모리 사용량 최적화: 필요한 컬럼만 미리 필터링
         df = normalize_columns(df)
         print(f"[DEBUG] Normalized DataFrame shape: {df.shape}")
+
+        # --- 로깅 및 필터링 로직 추가 ---
+        log_lines = []
+        original_filename = os.path.basename(file_path)
+        log_filename = f"{os.path.splitext(original_filename)[0]}_filter_log.txt"
+        # 로그 파일은 원본과 같은 디렉터리에 저장
+        log_path = os.path.join(os.path.dirname(file_path), log_filename)
+
+        # 1. '거래유형'이 '직거래'인 행 삭제 및 로깅
+        if '거래유형' in df.columns:
+            direct_deals = df[df['거래유형'] == '직거래']
+            if not direct_deals.empty:
+                log_lines.append(f"=== '거래유형'이 '직거래'여서 삭제된 데이터 ({len(direct_deals)}건) ===")
+                log_lines.append(direct_deals.to_string())
+                log_lines.append("\n")
+                df = df[df['거래유형'] != '직거래'].copy()
+                print(f"[FILTER] '직거래' 데이터 {len(direct_deals)}건 필터링 완료")
+
+        # 2. '해제사유발생일'에 날짜값이 있는 행 삭제 및 로깅 (수정된 로직)
+        if '해제사유발생일' in df.columns:
+            # 실제 날짜/숫자 데이터가 있는 행을 식별 (NaT/NaN이 아닌 값)
+            # pd.to_numeric은 숫자/날짜 형식의 문자열을 숫자로 변환하고, '-' 같은 문자는 NaN으로 만듭니다.
+            numeric_dates = pd.to_numeric(df['해제사유발생일'], errors='coerce')
+            cancelled_deals = df[numeric_dates.notna()]
+
+            if not cancelled_deals.empty:
+                log_lines.append(f"=== '해제사유발생일'이 존재하여 삭제된 데이터 ({len(cancelled_deals)}건) ===")
+                log_lines.append(cancelled_deals.to_string())
+                log_lines.append("\n")
+                # 숫자/날짜 형식의 값이 없는 행만 유지합니다.
+                df = df[numeric_dates.isna()].copy()
+                print(f"[FILTER] '해제사유발생일' 데이터 {len(cancelled_deals)}건 필터링 완료")
+
+        # 로그 파일이 생성될 경우에만 저장
+        if log_lines:
+            try:
+                with open(log_path, 'w', encoding='utf-8') as f:
+                    f.write("\n".join(log_lines))
+                print(f"[FILTER] 필터링 로그 파일이 생성되었습니다: {log_path}")
+            except Exception as e:
+                print(f"[ERROR] 필터링 로그 파일 저장 실패: {e}")
+        # --- 필터링 로직 종료 ---
         
         # 필요한 컬럼만 추출하여 메모리 사용량 감소
         col_map = {
@@ -190,6 +232,8 @@ def match_with_supabase(df, supabase: Client):
                 if response.data:
                     supabase_df = pd.DataFrame(response.data)
                     supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'apt_nm': '단지명'})
+                    # 중복 매칭 방지: 단지명 기준으로 중복 제거 후 첫번째 값만 사용
+                    supabase_df = supabase_df.drop_duplicates(subset=['단지명'], keep='first')
                     df = pd.merge(df, supabase_df[['단지명', '위도', '경도']], on='단지명', how='left', suffixes= ('_old', ''))
                     df['위도'] = df['위도'].fillna(df['위도_old'])
                     df['경도'] = df['경도'].fillna(df['경도_old'])
@@ -212,6 +256,8 @@ def match_with_supabase(df, supabase: Client):
                 if response.data:
                     supabase_df = pd.DataFrame(response.data)
                     supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'rdnmadr': '도로명'})
+                    # 중복 매칭 방지: 도로명 기준으로 중복 제거 후 첫번째 값만 사용
+                    supabase_df = supabase_df.drop_duplicates(subset=['도로명'], keep='first')
                     df = pd.merge(df, supabase_df[['도로명', '위도', '경도']], on='도로명', how='left', suffixes= ('_old', ''))
                     df['위도'] = df['위도'].fillna(df['위도_old'])
                     df['경도'] = df['경도'].fillna(df['경도_old'])
@@ -235,6 +281,8 @@ def match_with_supabase(df, supabase: Client):
                 if response.data:
                     supabase_df = pd.DataFrame(response.data)
                     supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'lnno_adres': 'full_address'})
+                    # 중복 매칭 방지: full_address 기준으로 중복 제거 후 첫번째 값만 사용
+                    supabase_df = supabase_df.drop_duplicates(subset=['full_address'], keep='first')
                     df = pd.merge(df, supabase_df[['full_address', '위도', '경도']], on='full_address', how='left', suffixes= ('_old', ''))
                     df['위도'] = df['위도'].fillna(df['위도_old'])
                     df['경도'] = df['경도'].fillna(df['경도_old'])
@@ -286,5 +334,26 @@ def match_with_supabase(df, supabase: Client):
     # 최종적으로 위도/경도가 없는 경우 NaN 유지
     df['위도'] = pd.to_numeric(df['위도'], errors='coerce')
     df['경도'] = pd.to_numeric(df['경도'], errors='coerce')
+
+    # 매칭 후 중복 제거: 실거래 핵심 정보 기준으로 중복 제거
+    print("[DEBUG] 매칭 후 중복 제거 시작...")
+    original_count = len(df)
+    
+    # 실거래 핵심 정보 컬럼들을 기준으로 중복 제거
+    key_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '거래금액', '층', '건축년도']
+    available_key_columns = [col for col in key_columns if col in df.columns]
+    
+    if available_key_columns:
+        # 중복 제거: 첫 번째 매칭 결과만 유지
+        df = df.drop_duplicates(subset=available_key_columns, keep='first')
+        final_count = len(df)
+        removed_count = original_count - final_count
+        
+        print(f"[DEBUG] 중복 제거 결과: {original_count}건 → {final_count}건 (제거: {removed_count}건)")
+        
+        if removed_count > 0:
+            print(f"[INFO] Supabase 매칭 과정에서 발생한 중복 데이터 {removed_count}건이 제거되었습니다.")
+    else:
+        print("[DEBUG] 중복 제거용 키 컬럼을 찾을 수 없습니다.")
 
     return df
