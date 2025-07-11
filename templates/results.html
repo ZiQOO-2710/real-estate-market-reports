@@ -472,9 +472,14 @@
                     sortElement.setAttribute('data-order', currentSortOrder);
                     sortElement.classList.add('active');
                     
-                    // 활성화된 컬럼은 항상 파란색 아래쪽 화살표
-                    sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
-                    console.log('[SORT DEBUG] 활성 컬럼 - 파란색 아래쪽 화살표 설정됨');
+                    // 정렬 순서에 따라 화살표 방향 설정
+                    if (currentSortOrder === 'asc') {
+                        sortElement.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
+                        console.log('[SORT DEBUG] 활성 컬럼 - 오름차순 화살표 설정됨');
+                    } else if (currentSortOrder === 'desc') {
+                        sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
+                        console.log('[SORT DEBUG] 활성 컬럼 - 내림차순 화살표 설정됨');
+                    }
                 }
             }
         });
@@ -489,6 +494,22 @@
                 newOrder = 'asc';
             } else {
                 newOrder = 'desc';
+            }
+            
+            console.log(`[SORT DEBUG] ${column}: ${currentOrder} → ${newOrder}`);
+            
+            // 모든 화살표 초기화
+            document.querySelectorAll('.sort-arrow').forEach(arrow => {
+                arrow.classList.remove('active');
+                arrow.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
+            });
+            
+            // 선택된 화살표만 활성화 및 방향 설정
+            sortElement.classList.add('active');
+            if (newOrder === 'asc') {
+                sortElement.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
+            } else {
+                sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
             }
             
             // 정렬 실행 (페이지 리로드 됨)
