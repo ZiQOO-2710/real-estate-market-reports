@@ -92,17 +92,12 @@
                 <div class="card">
                     <div class="card-header bg-info text-white">
                         <h2 class="h5 mb-0">단지별 거래 건수 (상위 5개)</h2>
-                        <small>💡 클릭하면 소재지번에 자동 입력됩니다</small>
                     </div>
                     <div class="card-body">
                         <ul class="list-group">
                             {% for complex, count in stats.complexes.items() %}
                                 {% if loop.index <= 5 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center clickable-complex" 
-                                    onclick="fillAddress('{{ complex }}')" 
-                                    style="cursor: pointer; transition: background-color 0.2s;"
-                                    onmouseover="this.style.backgroundColor='#f8f9fa'"
-                                    onmouseout="this.style.backgroundColor=''">
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
                                     {{ complex }}
                                     <span class="badge bg-info rounded-pill">{{ count }}건</span>
                                 </li>
