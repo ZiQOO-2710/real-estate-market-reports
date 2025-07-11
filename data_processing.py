@@ -229,11 +229,28 @@ def match_with_supabase(df, supabase: Client):
         
         for complex_name in unique_complexes:
             try:
-                response = supabase.table('apt_master_info') \
-                    .select('apt_nm, la, lo') \
-                    .eq('apt_nm', str(complex_name)[:50]) \
-                    .limit(1) \
-                    .execute()
+                # 해당 단지명을 가진 첫 번째 행에서 시군구 정보 추출
+                sample_row = df[df['단지명'] == complex_name].iloc[0]
+                region = sample_row.get('시군구', '')
+                
+                # 지역 정보를 이용한 필터링 (시군구의 첫 번째 단어 추출)
+                city_name = region.split()[0] if region else ''  # 예: "부산광역시" 추출
+                
+                if city_name:
+                    # 지역 필터를 포함한 검색
+                    response = supabase.table('apt_master_info') \
+                        .select('apt_nm, la, lo, lnno_adres') \
+                        .eq('apt_nm', str(complex_name)[:50]) \
+                        .ilike('lnno_adres', f'{city_name}%') \
+                        .limit(1) \
+                        .execute()
+                else:
+                    # 지역 필터 없이 검색
+                    response = supabase.table('apt_master_info') \
+                        .select('apt_nm, la, lo') \
+                        .eq('apt_nm', str(complex_name)[:50]) \
+                        .limit(1) \
+                        .execute()
                 
                 if response.data and response.data[0].get('la') and response.data[0].get('lo'):
                     lat, lon = response.data[0]['la'], response.data[0]['lo']
