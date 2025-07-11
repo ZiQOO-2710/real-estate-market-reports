@@ -215,6 +215,15 @@ def match_with_supabase(df, supabase: Client):
     """
     Pandas DataFrame의 데이터를 Supabase와 다단계로 매칭하여 위도/경도 정보를 추가합니다.
     """
+    # 문자열 길이 제한 (Supabase 스키마에 맞춤)
+    if '시군구' in df.columns:
+        df['시군구'] = df['시군구'].astype(str).str[:50]  # 시군구는 50자로 제한
+    if '단지명' in df.columns:
+        df['단지명'] = df['단지명'].astype(str).str[:100]  # 단지명은 100자로 제한
+    if '도로명' in df.columns:
+        df['도로명'] = df['도로명'].astype(str).str[:100]  # 도로명은 100자로 제한
+    print("[DEBUG] 문자열 길이 제한 적용 완료")
+    
     df['위도'] = np.nan
     df['경도'] = np.nan
 
