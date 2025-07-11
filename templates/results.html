@@ -80,6 +80,21 @@
             direction: rtl;
             text-align: left;
         }
+        
+        /* 테이블 행 클릭 시 하이라이트 */
+        #resultTable tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        #resultTable tbody tr:hover {
+            background-color: #f8f9fa !important;
+        }
+        
+        #resultTable tbody tr.selected {
+            background-color: #e3f2fd !important;
+            border-left: 4px solid #007bff;
+        }
     </style>
 </head>
 <body>
@@ -163,7 +178,11 @@
                         </thead>
                         <tbody>
                             {% for row in data %}
-                            <tr>
+                            <tr onclick="highlightMarker({{ loop.index0 }})" 
+                                data-lat="{{ row.get('위도', '') }}" 
+                                data-lon="{{ row.get('경도', '') }}"
+                                data-complex="{{ row.get('단지명', '') }}"
+                                data-price="{{ row.get('거래금액', '') }}">
                                 {% set display_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'] %}
                                 {% for col in display_columns %}
                                 {% if col in columns %}
@@ -334,6 +353,7 @@
             }
             
             const map = L.map('map').setView([centerLat, centerLon], 13);
+            window.map = map;  // 전역 접근을 위해 저장
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
@@ -352,13 +372,85 @@
             L.popup().setLatLng([centerLat, centerLon]).setContent('<b>주소 변환 실패</b><br>기본 위치를 표시합니다.').openOn(map);
             {% endif %}
 
-            // 단지 마커
-            aptList.forEach(function(apt) {
+            // 단지 마커 생성 및 전역 배열에 저장
+            window.aptMarkers = [];
+            aptList.forEach(function(apt, index) {
                 if (apt['위도'] && apt['경도']) {
                     const marker = L.marker([apt['위도'], apt['경도']]).addTo(map);
                     marker.bindPopup(`<b>${apt['단지명']}</b><br>거래금액: ${apt['거래금액']}만원`);
+                    
+                    // 마커에 인덱스 정보 저장
+                    marker.aptIndex = index;
+                    marker.originalIcon = marker.getIcon();
+                    
+                    // 전역 배열에 추가
+                    window.aptMarkers.push(marker);
                 }
             });
+        }
+        
+        // 테이블 행 클릭 시 마커 하이라이트 함수
+        let selectedMarker = null;
+        let selectedRowIndex = null;
+        
+        function highlightMarker(rowIndex) {
+            // 이전 선택 해제
+            if (selectedMarker) {
+                selectedMarker.setIcon(selectedMarker.originalIcon);
+                selectedMarker.setZIndexOffset(0);
+            }
+            
+            // 이전 테이블 행 선택 해제
+            const previousRow = document.querySelector('#resultTable tbody tr.selected');
+            if (previousRow) {
+                previousRow.classList.remove('selected');
+            }
+            
+            // 새로운 행 선택
+            const currentRow = document.querySelector(`#resultTable tbody tr:nth-child(${rowIndex + 1})`);
+            if (currentRow) {
+                currentRow.classList.add('selected');
+                
+                // 해당 좌표의 마커 찾기
+                const lat = parseFloat(currentRow.dataset.lat);
+                const lon = parseFloat(currentRow.dataset.lon);
+                
+                if (lat && lon && window.aptMarkers) {
+                    // 좌표가 일치하는 마커 찾기
+                    const targetMarker = window.aptMarkers.find(marker => {
+                        const markerLatLng = marker.getLatLng();
+                        return Math.abs(markerLatLng.lat - lat) < 0.0001 && 
+                               Math.abs(markerLatLng.lng - lon) < 0.0001;
+                    });
+                    
+                    if (targetMarker) {
+                        // 마커 하이라이트
+                        const highlightIcon = L.divIcon({
+                            className: 'highlighted-marker',
+                            html: '<div style="background-color: #ff4444; border: 3px solid #ffffff; border-radius: 50%; width: 25px; height: 25px; box-shadow: 0 2px 10px rgba(255,68,68,0.5);"></div>',
+                            iconSize: [25, 25],
+                            iconAnchor: [12.5, 12.5]
+                        });
+                        
+                        targetMarker.setIcon(highlightIcon);
+                        targetMarker.setZIndexOffset(1000);
+                        
+                        // 팝업 열기
+                        targetMarker.openPopup();
+                        
+                        // 지도 중심을 마커로 이동 (부드럽게)
+                        if (window.map) {
+                            window.map.setView([lat, lon], window.map.getZoom(), {
+                                animate: true,
+                                duration: 0.5
+                            });
+                        }
+                        
+                        selectedMarker = targetMarker;
+                        selectedRowIndex = rowIndex;
+                    }
+                }
+            }
         }
         
         // DOM이 완전히 로드된 후 지도 초기화 함수를 실행합니다.
@@ -435,8 +527,16 @@
             tbody.innerHTML = '';
             const displayColumns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'];
             
-            data.forEach(row => {
+            data.forEach((row, index) => {
                 const tr = document.createElement('tr');
+                
+                // 클릭 이벤트와 데이터 속성 추가
+                tr.onclick = () => highlightMarker(index);
+                tr.setAttribute('data-lat', row['위도'] || '');
+                tr.setAttribute('data-lon', row['경도'] || '');
+                tr.setAttribute('data-complex', row['단지명'] || '');
+                tr.setAttribute('data-price', row['거래금액'] || '');
+                
                 displayColumns.forEach(col => {
                     const td = document.createElement('td');
                     td.style.textAlign = 'right';
