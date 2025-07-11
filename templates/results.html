@@ -52,17 +52,23 @@
         /* 정렬 화살표 스타일 */
         .sort-arrow {
             cursor: pointer;
-            color: #dc3545;
+            color: #dc3545;  /* 기본: 빨간색 */
             font-size: 1.1rem;
             margin-left: 8px;
             transition: color 0.2s;
         }
         
         .sort-arrow:hover {
-            color: #007bff;
+            opacity: 0.7;
         }
         
-        .sort-arrow.active {
+        /* 위쪽 화살표 (오름차순): 빨간색 */
+        .sort-arrow.asc {
+            color: #dc3545;
+        }
+        
+        /* 아래쪽 화살표 (내림차순): 파란색 */
+        .sort-arrow.desc {
             color: #007bff;
         }
         
@@ -470,15 +476,16 @@
                 
                 if (sortElement) {
                     sortElement.setAttribute('data-order', currentSortOrder);
-                    sortElement.classList.add('active');
                     
-                    // 정렬 순서에 따라 화살표 방향 설정
+                    // 정렬 순서에 따라 화살표 방향과 색상 설정
                     if (currentSortOrder === 'asc') {
                         sortElement.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
-                        console.log('[SORT DEBUG] 활성 컬럼 - 오름차순 화살표 설정됨');
+                        sortElement.className = 'sort-arrow asc';  // 빨간색 위쪽 화살표
+                        console.log('[SORT DEBUG] 활성 컬럼 - 오름차순 화살표 설정됨 (빨간색)');
                     } else if (currentSortOrder === 'desc') {
                         sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
-                        console.log('[SORT DEBUG] 활성 컬럼 - 내림차순 화살표 설정됨');
+                        sortElement.className = 'sort-arrow desc';  // 파란색 아래쪽 화살표
+                        console.log('[SORT DEBUG] 활성 컬럼 - 내림차순 화살표 설정됨 (파란색)');
                     }
                 }
             }
@@ -498,17 +505,18 @@
             
             console.log(`[SORT DEBUG] ${column}: ${currentOrder} → ${newOrder}`);
             
-            // 모든 화살표 초기화
+            // 모든 화살표 초기화 (기본: 빨간색 위쪽 화살표)
             document.querySelectorAll('.sort-arrow').forEach(arrow => {
-                arrow.classList.remove('active');
+                arrow.className = 'sort-arrow';
                 arrow.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
             });
             
-            // 선택된 화살표만 활성화 및 방향 설정
-            sortElement.classList.add('active');
+            // 선택된 화살표만 방향과 색상 설정
             if (newOrder === 'asc') {
+                sortElement.className = 'sort-arrow asc';  // 빨간색 위쪽 화살표
                 sortElement.innerHTML = '<i class="bi bi-caret-up-fill"></i>';
             } else {
+                sortElement.className = 'sort-arrow desc';  // 파란색 아래쪽 화살표
                 sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
             }
             
