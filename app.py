@@ -132,12 +132,10 @@ def get_file_hash(file_path):
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
-        print(f"[UPLOAD] === 업로드 요청 디버깅 시작 ===")
-        print(f"[UPLOAD] Request method: {request.method}")
-        print(f"[UPLOAD] Request content type: {request.content_type}")
-        print(f"[UPLOAD] Request files keys: {list(request.files.keys())}")
-        print(f"[UPLOAD] Request files: {request.files}")
-        print(f"[UPLOAD] Request form: {request.form}")
+        print(f"[UPLOAD] 🚀 === 데이터 분석 시작 ===")
+        print(f"[UPLOAD] 📝 요청 정보: {request.method} - {request.content_type}")
+        print(f"[UPLOAD] 📁 파일 키: {list(request.files.keys())}")
+        print(f"[UPLOAD] 🔄 단계 1/6: 파일 업로드 시작...")
         
         # 'file' 키가 있는지 확인
         if 'file' not in request.files:
@@ -173,45 +171,56 @@ def upload_file():
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        print(f"[UPLOAD] File saved to: {file_path}")
+        print(f"[UPLOAD] 💾 파일 저장: {file_path}")
+        print(f"[UPLOAD] 📏 파일 크기: {os.path.getsize(file_path):,} bytes")
+        print(f"[UPLOAD] ✅ 단계 1/6: 파일 업로드 완료")
 
         # 파일 해시로 분석 결과 캐싱
         file_hash = get_file_hash(file_path)
         analyzed_path = os.path.join(app.config['UPLOAD_FOLDER'], f'{file_hash}_분석완료.csv')
         
         if os.path.exists(analyzed_path):
-            print(f"[UPLOAD] 분석 캐시 파일 존재: {analyzed_path}")
+            print(f"[UPLOAD] 🎯 캐시 파일 발견: {analyzed_path}")
+            print(f"[UPLOAD] 📊 캐시 파일 크기: {os.path.getsize(analyzed_path):,} bytes")
+            print(f"[UPLOAD] ⚡ 캐시 파일 사용으로 빠른 처리")
             df = pd.read_csv(analyzed_path, encoding='utf-8-sig')
             columns = df.columns.tolist()
             temp_path = analyzed_path
         else:
-            print("[UPLOAD] Calling process_uploaded_csv...")
+            print("[UPLOAD] 🔄 단계 2/6: 데이터 전처리 시작...")
             temp_path, columns = process_uploaded_csv(file_path)
-            print(f"[UPLOAD] process_uploaded_csv returned temp_path: {temp_path}")
+            print(f"[UPLOAD] ✅ 단계 2/6: 데이터 전처리 완료 - 처리된 파일: {temp_path}")
             df = pd.read_csv(temp_path, encoding='utf-8-sig')
-            print(f"[UPLOAD] DataFrame loaded from temp_path. Columns: {df.columns.tolist()}")
-            print(f"[UPLOAD] DataFrame head:\n{df.head()}")
-            print("[UPLOAD] Supabase 매칭 재활성화...")
+            print(f"[UPLOAD] 📊 데이터 로드 완료 - 행 수: {len(df)}, 컬럼 수: {len(df.columns)}")
+            print(f"[UPLOAD] 📋 컬럼 목록: {df.columns.tolist()}")
+            
+            print("[UPLOAD] 🔄 단계 3/6: Supabase DB 좌표 조회 시작...")
             df = match_with_supabase(df, supabase)  # 재활성화
+            print("[UPLOAD] ✅ 단계 3/6: Supabase DB 좌표 조회 완료")
             
             # 신규 아파트 정보 DB 저장
-            print("[UPLOAD] 신규 아파트 정보 DB 저장...")
+            print("[UPLOAD] 🔄 단계 4/6: 신규 아파트 정보 DB 저장 시작...")
             try:
                 insert_new_apartments_to_supabase(df, supabase)
-                print("[UPLOAD] 신규 아파트 정보 DB 저장 완료")
+                print("[UPLOAD] ✅ 단계 4/6: 신규 아파트 정보 DB 저장 완료")
             except Exception as e:
-                print(f"[UPLOAD] 신규 아파트 정보 DB 저장 실패: {e}")
+                print(f"[UPLOAD] ❌ 단계 4/6: 신규 아파트 정보 DB 저장 실패: {e}")
             
             # 좌표 변환 및 DB 저장 완료
-            print("[UPLOAD] 좌표 변환 및 DB 저장 완료")
-            print(f"[UPLOAD] DataFrame columns: {df.columns.tolist()}")
-            print(f"[UPLOAD] DataFrame head:\n{df.head()}")
+            print("[UPLOAD] 🔄 단계 5/6: 데이터 분석 시작...")
+            coord_count = df[['위도', '경도']].dropna().shape[0]
+            print(f"[UPLOAD] 📍 좌표 보유 데이터: {coord_count}건 / 전체 {len(df)}건")
+            print("[UPLOAD] ✅ 단계 5/6: 데이터 분석 완료")
             
             # 분석 결과를 캐시 파일로 저장
+            print("[UPLOAD] 🔄 단계 6/6: 결과 파일 생성 시작...")
             df.to_csv(analyzed_path, index=False, encoding='utf-8-sig')
             temp_path = analyzed_path
-            print(f"[UPLOAD] 분석 결과 캐시 파일 저장: {analyzed_path}")
+            print(f"[UPLOAD] 💾 결과 파일 저장: {analyzed_path}")
+            print("[UPLOAD] ✅ 단계 6/6: 결과 파일 생성 완료")
+            
         session['datafile'] = os.path.basename(temp_path)
+        print(f"[UPLOAD] 🎉 === 데이터 분석 완료 === 총 {len(df) if 'df' in locals() else 0}건 처리")
         print(f"[UPLOAD] Processed file saved to session: {session['datafile']}")
         stats = get_stats(df)
         print("[UPLOAD] Stats generated. Rendering analysis.html...")
