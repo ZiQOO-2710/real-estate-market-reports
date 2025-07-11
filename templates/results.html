@@ -30,6 +30,42 @@
         #resultTable th:nth-child(9), #resultTable td:nth-child(9) { width: 10%; } /* 공급평당 */
         #resultTable th:nth-child(10), #resultTable td:nth-child(10) { width: 8%; } /* 거리 */
         
+        /* 테이블 헤더 스타일 */
+        #resultTable th {
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: middle;
+            border-right: 1px solid #dee2e6;
+        }
+        
+        /* 테이블 셀 스타일 */
+        #resultTable td {
+            border-right: 1px solid #dee2e6;
+        }
+        
+        /* 마지막 컬럼은 오른쪽 테두리 제거 */
+        #resultTable th:last-child,
+        #resultTable td:last-child {
+            border-right: none;
+        }
+        
+        /* 정렬 화살표 스타일 */
+        .sort-arrow {
+            cursor: pointer;
+            color: #dc3545;
+            font-size: 1.1rem;
+            margin-left: 8px;
+            transition: color 0.2s;
+        }
+        
+        .sort-arrow:hover {
+            color: #007bff;
+        }
+        
+        .sort-arrow.active {
+            color: #007bff;
+        }
+        
         /* 단지명 컬럼만 텍스트 오버플로우 처리 */
         #resultTable td:nth-child(3) {
             white-space: nowrap;
@@ -103,35 +139,25 @@
                         <thead>
                             <tr>
                                 {% set display_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '층', '거래금액', '전용평당', '공급평당'] %}
+                                {% set column_names = {'전용면적(㎡)': '전용(㎡)'} %}
                                 {% for col in display_columns %}
                                 {% if col in columns %}
                                 <th>
-                                    {{ col }}
-                                    <div class="btn-group btn-group-sm sort-buttons" role="group">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                            onclick="sortTable('{{ col }}', 'asc')" title="오름차순 정렬">
-                                            <i class="bi bi-sort-up"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                            onclick="sortTable('{{ col }}', 'desc')" title="내림차순 정렬">
-                                            <i class="bi bi-sort-down"></i>
-                                        </button>
-                                    </div>
+                                    {{ column_names.get(col, col) }}
+                                    <span class="sort-arrow" onclick="toggleSort('{{ col }}')" 
+                                          id="sort-{{ col.replace('(', '').replace(')', '').replace('㎡', '') }}" 
+                                          data-column="{{ col }}" data-order="none">
+                                        <i class="bi bi-caret-up-fill"></i>
+                                    </span>
                                 </th>
                                 {% endif %}
                                 {% endfor %}
                                 <th>
-                                    거리(중심점 기준, m)
-                                    <div class="btn-group btn-group-sm sort-buttons" role="group">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                            onclick="sortTable('중심점과의거리', 'asc')" title="오름차순 정렬">
-                                            <i class="bi bi-sort-up"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm" 
-                                            onclick="sortTable('중심점과의거리', 'desc')" title="내림차순 정렬">
-                                            <i class="bi bi-sort-down"></i>
-                                        </button>
-                                    </div>
+                                    거리(m)
+                                    <span class="sort-arrow" onclick="toggleSort('중심점과의거리')" 
+                                          id="sort-거리" data-column="중심점과의거리" data-order="none">
+                                        <i class="bi bi-caret-up-fill"></i>
+                                    </span>
                                 </th>
                             </tr>
                         </thead>
@@ -339,6 +365,44 @@
         document.addEventListener('DOMContentLoaded', initMap);
     </script>
     <script>
+        // 페이지 로드 시 현재 정렬 상태 복원
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentSortCol = '{{ session.get("filter_params", {}).get("sort_col", "") }}';
+            const currentSortOrder = '{{ session.get("filter_params", {}).get("sort_order", "") }}';
+            
+            console.log('[SORT DEBUG] 현재 정렬 상태:', currentSortCol, currentSortOrder);
+            
+            if (currentSortCol && currentSortOrder) {
+                const sortElement = document.querySelector(`[data-column="${currentSortCol}"]`);
+                console.log('[SORT DEBUG] 찾은 정렬 요소:', sortElement);
+                
+                if (sortElement) {
+                    sortElement.setAttribute('data-order', currentSortOrder);
+                    sortElement.classList.add('active');
+                    
+                    // 활성화된 컬럼은 항상 파란색 아래쪽 화살표
+                    sortElement.innerHTML = '<i class="bi bi-caret-down-fill"></i>';
+                    console.log('[SORT DEBUG] 활성 컬럼 - 파란색 아래쪽 화살표 설정됨');
+                }
+            }
+        });
+        
+        function toggleSort(column) {
+            const sortElement = document.querySelector(`[data-column="${column}"]`);
+            const currentOrder = sortElement.getAttribute('data-order');
+            let newOrder;
+            
+            // 정렬 순서 결정: none → asc → desc → asc → ...
+            if (currentOrder === 'none' || currentOrder === 'desc') {
+                newOrder = 'asc';
+            } else {
+                newOrder = 'desc';
+            }
+            
+            // 정렬 실행 (페이지 리로드 됨)
+            sortTable(column, newOrder);
+        }
+        
         function sortTable(column, order) {
             // 정렬을 위한 폼 생성 및 제출
             const form = document.createElement('form');
