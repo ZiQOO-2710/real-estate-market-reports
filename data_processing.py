@@ -221,104 +221,108 @@ def match_with_supabase(df, supabase: Client):
     df['위도'] = np.nan
     df['경도'] = np.nan
     
-    # 1단계: Supabase에서 기존 좌표 조회
-    print("[DEBUG] 1단계: Supabase에서 기존 좌표 조회...")
-    try:
-        # 고유한 단지명 목록
-        unique_complexes = df['단지명'].dropna().unique()[:20]  # 최대 20개만
-        
-        for complex_name in unique_complexes:
-            try:
-                # 해당 단지명을 가진 첫 번째 행에서 시군구 정보 추출
-                sample_row = df[df['단지명'] == complex_name].iloc[0]
-                region = sample_row.get('시군구', '')
-                
-                # 지역 정보를 이용한 필터링 (시군구의 첫 번째 단어 추출)
-                city_name = region.split()[0] if region else ''  # 예: "부산광역시" 추출
-                
-                if city_name:
-                    # 지역 필터를 포함한 검색
-                    response = supabase.table('apt_master_info') \
-                        .select('apt_nm, la, lo, lnno_adres') \
-                        .eq('apt_nm', str(complex_name)[:50]) \
-                        .ilike('lnno_adres', f'{city_name}%') \
-                        .limit(1) \
-                        .execute()
-                else:
-                    # 지역 필터 없이 검색
-                    response = supabase.table('apt_master_info') \
-                        .select('apt_nm, la, lo') \
-                        .eq('apt_nm', str(complex_name)[:50]) \
-                        .limit(1) \
-                        .execute()
-                
-                if response.data and response.data[0].get('la') and response.data[0].get('lo'):
-                    lat, lon = response.data[0]['la'], response.data[0]['lo']
-                    # 해당 단지명을 가진 모든 행에 좌표 적용
-                    mask = df['단지명'] == complex_name
-                    df.loc[mask, '위도'] = lat
-                    df.loc[mask, '경도'] = lon
-                    print(f"[DEBUG] Supabase 조회 성공: {complex_name} -> {lat}, {lon}")
-                    
-            except Exception as e:
-                print(f"[DEBUG] Supabase 조회 오류 (계속 진행): {e}")
-                continue
-                
-    except Exception as e:
-        print(f"[DEBUG] Supabase 연결 오류, Kakao API만 사용: {e}")
+    # 1단계: 시군구+번지 조합으로 효율적 좌표 조회
+    print("[DEBUG] 1단계: 시군구+번지 기반 효율적 좌표 조회...")
     
-    # 2단계: 좌표가 없는 데이터는 Kakao API로 조회
-    print("[DEBUG] 2단계: Kakao API로 신규 좌표 조회...")
+    # 고유한 시군구+번지 조합 생성 (최대 50개)
+    unique_addresses = []
+    address_to_rows = {}  # 주소 -> 해당하는 DataFrame 인덱스들
+    
+    for idx, row in df.iterrows():
+        if row.get('시군구') and row.get('번지'):
+            addr_key = f"{row.get('시군구', '')} {row.get('번지', '')}".strip()
+            if addr_key not in address_to_rows:
+                unique_addresses.append(addr_key)
+                address_to_rows[addr_key] = []
+            address_to_rows[addr_key].append(idx)
+    
+    # 최대 50개 주소만 처리 (너무 많으면 제한)
+    unique_addresses = unique_addresses[:50]
+    print(f"[DEBUG] 처리할 고유 주소: {len(unique_addresses)}개")
+    
+    # Kakao API로 주소별 좌표 조회
+    location_cache = {}
+    for addr in unique_addresses:
+        if addr not in location_cache:
+            print(f"[DEBUG] Kakao API 조회: {addr}")
+            lat, lon = get_latlon_from_address(addr)
+            if lat and lon:
+                location_cache[addr] = (lat, lon)
+                print(f"[DEBUG] Kakao API 성공: {addr} -> {lat}, {lon}")
+                
+                # 같은 주소를 가진 모든 행에 좌표 적용
+                for row_idx in address_to_rows[addr]:
+                    df.at[row_idx, '위도'] = lat
+                    df.at[row_idx, '경도'] = lon
+            else:
+                print(f"[DEBUG] Kakao API 실패: {addr}")
+    
+    print(f"[DEBUG] 1단계 완료: {len(location_cache)}개 주소 좌표 획득")
+    
+    # 2단계: 좌표가 없는 데이터는 Supabase DB에서 단지명으로 조회
+    print("[DEBUG] 2단계: Supabase DB 단지명 조회 (백업)...")
     missing_coords = df[df['위도'].isna()]
     
     if not missing_coords.empty:
-        location_cache = {}
-        
-        # 우선순위: 도로명 → 시군구+번지 → 시군구+단지명 → 시군구
-        for idx, row in missing_coords.iterrows():
-            address_candidates = []
+        try:
+            unique_complexes = missing_coords['단지명'].dropna().unique()[:20]
             
-            # 1순위: 도로명 주소
-            if row.get('도로명'):
-                road_addr = f"{row.get('시군구', '')} {row.get('도로명', '')}".strip()
-                address_candidates.append(road_addr)
+            for complex_name in unique_complexes:
+                try:
+                    # 해당 단지명을 가진 첫 번째 행에서 시군구 정보 추출
+                    sample_row = missing_coords[missing_coords['단지명'] == complex_name].iloc[0]
+                    region = sample_row.get('시군구', '')
+                    city_name = region.split()[0] if region else ''
+                    
+                    if city_name:
+                        response = supabase.table('apt_master_info') \
+                            .select('apt_nm, la, lo, lnno_adres') \
+                            .eq('apt_nm', str(complex_name)[:50]) \
+                            .ilike('lnno_adres', f'{city_name}%') \
+                            .limit(1) \
+                            .execute()
+                    else:
+                        response = supabase.table('apt_master_info') \
+                            .select('apt_nm, la, lo') \
+                            .eq('apt_nm', str(complex_name)[:50]) \
+                            .limit(1) \
+                            .execute()
+                    
+                    if response.data and response.data[0].get('la') and response.data[0].get('lo'):
+                        lat, lon = response.data[0]['la'], response.data[0]['lo']
+                        # 해당 단지명을 가진 모든 행에 좌표 적용
+                        mask = df['단지명'] == complex_name
+                        df.loc[mask, '위도'] = lat
+                        df.loc[mask, '경도'] = lon
+                        print(f"[DEBUG] Supabase 조회 성공: {complex_name} -> {lat}, {lon}")
+                        
+                except Exception as e:
+                    print(f"[DEBUG] Supabase 조회 오류: {e}")
+                    
+        except Exception as e:
+            print(f"[DEBUG] Supabase 연결 오류: {e}")
+    
+    # 3단계: 여전히 좌표가 없는 데이터는 시군구 중심 좌표 사용
+    print("[DEBUG] 3단계: 시군구 중심 좌표 적용 (최종 백업)...")
+    final_missing = df[df['위도'].isna()]
+    
+    if not final_missing.empty:
+        district_cache = {}
+        for idx, row in final_missing.iterrows():
+            district = row.get('시군구', '').strip()
+            if district and district not in district_cache:
+                print(f"[DEBUG] 시군구 중심 좌표 조회: {district}")
+                lat, lon = get_latlon_from_address(district)
+                if lat and lon:
+                    district_cache[district] = (lat, lon)
+                    print(f"[DEBUG] 시군구 중심 좌표 성공: {district} -> {lat}, {lon}")
             
-            # 2순위: 시군구 + 번지
-            if row.get('번지'):
-                jibun_addr = f"{row.get('시군구', '')} {row.get('번지', '')}".strip()
-                address_candidates.append(jibun_addr)
-            
-            # 3순위: 시군구 + 단지명
-            if row.get('단지명'):
-                complex_addr = f"{row.get('시군구', '')} {row.get('단지명', '')}".strip()
-                address_candidates.append(complex_addr)
-            
-            # 4순위: 시군구만
-            if row.get('시군구'):
-                district_addr = row.get('시군구', '').strip()
-                address_candidates.append(district_addr)
-            
-            # 주소 후보들을 순서대로 시도
-            coords_found = False
-            for addr in address_candidates:
-                if addr and addr not in location_cache:
-                    print(f"[DEBUG] Kakao API 조회: {addr}")
-                    lat, lon = get_latlon_from_address(addr)
-                    if lat and lon:
-                        location_cache[addr] = (lat, lon)
-                        print(f"[DEBUG] Kakao API 성공: {addr} -> {lat}, {lon}")
-                
-                if addr in location_cache:
-                    lat, lon = location_cache[addr]
-                    df.at[idx, '위도'] = lat
-                    df.at[idx, '경도'] = lon
-                    coords_found = True
-                    break
-            
-            if not coords_found:
-                print(f"[DEBUG] 좌표 조회 실패: {row.get('시군구', '')} {row.get('단지명', '')}")
-        
-        print(f"[DEBUG] 총 {len(location_cache)}개 고유 주소 조회 완료")
+            if district in district_cache:
+                lat, lon = district_cache[district]
+                df.at[idx, '위도'] = lat
+                df.at[idx, '경도'] = lon
+    
+    print(f"[DEBUG] 좌표 조회 완료: 전체 {len(df)}건 중 {len(df.dropna(subset=['위도', '경도']))}건 좌표 보유")
     
     # 중복 제거
     print("[DEBUG] 중복 제거 시작...")
