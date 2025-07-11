@@ -183,10 +183,39 @@ def upload_file():
             print(f"[UPLOAD] DataFrame head:\n{df.head()}")
             print("[UPLOAD] Supabase 매칭 임시 비활성화...")
             # df = match_with_supabase(df, supabase)  # 임시 비활성화
-            # 위도/경도 컬럼 추가 (빈 값으로)
+            # Kakao Maps API로 주소 -> 좌표 변환
+            print("[UPLOAD] Kakao Maps API로 좌표 변환 시작...")
             df['위도'] = np.nan
             df['경도'] = np.nan
-            print(f"[UPLOAD] 로컬 분석 모드 완료. Columns: {df.columns.tolist()}")
+            
+            # 주소 기반 좌표 변환 (다양한 주소 형식 시도)
+            converted_count = 0
+            for idx, row in df.head(50).iterrows():
+                # 다양한 주소 형식 시도
+                address_formats = [
+                    f"{row.get('시군구', '')} {row.get('단지명', '')}",  # 기본 형식
+                    f"{row.get('시군구', '')} {row.get('번지', '')}",     # 시군구 + 번지
+                    f"{row.get('도로명', '')}",                         # 도로명만
+                    f"{row.get('시군구', '')}",                         # 시군구만
+                ]
+                
+                lat, lon = None, None
+                for address in address_formats:
+                    if address and address.strip():
+                        print(f"[UPLOAD] 좌표 변환 시도: {address}")
+                        lat, lon = get_latlon_from_address(address)
+                        if lat and lon:
+                            df.at[idx, '위도'] = lat
+                            df.at[idx, '경도'] = lon
+                            converted_count += 1
+                            print(f"[UPLOAD] ✅ 좌표 변환 성공 ({converted_count}): {address} -> {lat}, {lon}")
+                            break
+                        else:
+                            print(f"[UPLOAD] ❌ 좌표 변환 실패: {address}")
+            
+            print(f"[UPLOAD] 총 {converted_count}건의 좌표 변환 완료")
+            
+            print(f"[UPLOAD] Kakao 좌표 변환 완료. Columns: {df.columns.tolist()}")
             print(f"[UPLOAD] DataFrame head after local processing:\n{df.head()}")
             # Supabase 좌표 매칭 임시 비활성화
             print("[UPLOAD] Supabase 좌표 매칭 및 신규 데이터 추가 임시 비활성화...")

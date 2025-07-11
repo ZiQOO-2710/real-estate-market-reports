@@ -1,3 +1,6 @@
+// 전역 변수
+let timerInterval;
+
 // 문서 로드 완료 시 실행
 document.addEventListener('DOMContentLoaded', function() {
     console.log('부동산 거래 데이터 분석 시스템이 로드되었습니다.');
