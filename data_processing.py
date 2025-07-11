@@ -213,35 +213,77 @@ def _decode_supabase_strings(df, columns_to_decode):
 
 def match_with_supabase(df, supabase: Client):
     """
-    임시로 Supabase 연결 비활성화 - character varying(4) 오류 해결을 위해
+    Supabase에서 기존 좌표 조회 후, 없으면 Kakao API로 새로 획득
     """
-    print("[DEBUG] Supabase 매칭 임시 비활성화 - 로컬 분석 모드")
-    print("[DEBUG] character varying(4) 오류 해결을 위해 Supabase 연결 스킵")
+    from map_utils import get_latlon_from_address
     
-    # 위도/경도 컬럼 추가 (빈 값으로)
+    print("[DEBUG] Supabase 매칭 재활성화")
     df['위도'] = np.nan
     df['경도'] = np.nan
     
-    # 중복 제거 로직은 유지
+    # 1단계: Supabase에서 기존 좌표 조회
+    print("[DEBUG] 1단계: Supabase에서 기존 좌표 조회...")
+    try:
+        # 고유한 단지명 목록
+        unique_complexes = df['단지명'].dropna().unique()[:20]  # 최대 20개만
+        
+        for complex_name in unique_complexes:
+            try:
+                response = supabase.table('apt_master_info') \
+                    .select('apt_nm, la, lo') \
+                    .eq('apt_nm', str(complex_name)[:50]) \
+                    .limit(1) \
+                    .execute()
+                
+                if response.data and response.data[0].get('la') and response.data[0].get('lo'):
+                    lat, lon = response.data[0]['la'], response.data[0]['lo']
+                    # 해당 단지명을 가진 모든 행에 좌표 적용
+                    mask = df['단지명'] == complex_name
+                    df.loc[mask, '위도'] = lat
+                    df.loc[mask, '경도'] = lon
+                    print(f"[DEBUG] Supabase 조회 성공: {complex_name} -> {lat}, {lon}")
+                    
+            except Exception as e:
+                print(f"[DEBUG] Supabase 조회 오류 (계속 진행): {e}")
+                continue
+                
+    except Exception as e:
+        print(f"[DEBUG] Supabase 연결 오류, Kakao API만 사용: {e}")
+    
+    # 2단계: 좌표가 없는 데이터는 Kakao API로 조회
+    print("[DEBUG] 2단계: Kakao API로 신규 좌표 조회...")
+    missing_coords = df[df['위도'].isna()]
+    
+    if not missing_coords.empty:
+        unique_locations = missing_coords['시군구'].dropna().unique()[:10]
+        location_cache = {}
+        
+        for location in unique_locations:
+            print(f"[DEBUG] Kakao API 조회: {location}")
+            lat, lon = get_latlon_from_address(location)
+            if lat and lon:
+                location_cache[location] = (lat, lon)
+                print(f"[DEBUG] Kakao API 성공: {location} -> {lat}, {lon}")
+        
+        # 좌표 적용
+        for idx, row in missing_coords.iterrows():
+            location = row.get('시군구', '')
+            if location in location_cache:
+                lat, lon = location_cache[location]
+                df.at[idx, '위도'] = lat
+                df.at[idx, '경도'] = lon
+    
+    # 중복 제거
     print("[DEBUG] 중복 제거 시작...")
     original_count = len(df)
-    
-    # 실거래 핵심 정보 컬럼들을 기준으로 중복 제거
     key_columns = ['시군구', '번지', '단지명', '전용면적(㎡)', '계약년월', '거래금액', '층', '건축년도']
     available_key_columns = [col for col in key_columns if col in df.columns]
     
     if available_key_columns:
-        # 중복 제거: 첫 번째 매칭 결과만 유지
         df = df.drop_duplicates(subset=available_key_columns, keep='first')
         final_count = len(df)
         removed_count = original_count - final_count
-        
         print(f"[DEBUG] 중복 제거 결과: {original_count}건 → {final_count}건 (제거: {removed_count}건)")
-        
-        if removed_count > 0:
-            print(f"[INFO] 중복 데이터 {removed_count}건이 제거되었습니다.")
-    else:
-        print("[DEBUG] 중복 제거용 키 컬럼을 찾을 수 없습니다.")
     
     print(f"[DEBUG] 최종 DataFrame shape: {df.shape}")
     return df

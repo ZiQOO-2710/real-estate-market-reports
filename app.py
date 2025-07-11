@@ -191,9 +191,9 @@ def upload_file():
             df = pd.read_csv(temp_path, encoding='utf-8-sig')
             print(f"[UPLOAD] DataFrame loaded from temp_path. Columns: {df.columns.tolist()}")
             print(f"[UPLOAD] DataFrame head:\n{df.head()}")
-            print("[UPLOAD] Supabase 매칭 임시 비활성화...")
-            # df = match_with_supabase(df, supabase)  # 임시 비활성화
-            # Kakao Maps API로 주소 -> 좌표 변환
+            print("[UPLOAD] Supabase 매칭 재활성화...")
+            df = match_with_supabase(df, supabase)  # 재활성화
+            # Kakao Maps API는 match_with_supabase 내부에서 처리
             print("[UPLOAD] Kakao Maps API로 좌표 변환 시작...")
             df['위도'] = np.nan
             df['경도'] = np.nan
