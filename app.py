@@ -1,6 +1,16 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
 from supabase import create_client, Client
+
+# .env 파일 로드
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print(f"[ENV] .env 파일 로드 완료. KAKAO_REST_API_KEY: {'설정됨' if os.environ.get('KAKAO_REST_API_KEY') else '없음'}")
+except ImportError:
+    print("[ENV] python-dotenv 패키지가 없습니다. 환경변수가 수동으로 설정되어야 합니다.")
+except Exception as e:
+    print(f"[ENV] .env 파일 로드 중 오류: {e}")
 import pandas as pd
 import numpy as np
 from werkzeug.utils import secure_filename
