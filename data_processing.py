@@ -213,140 +213,17 @@ def _decode_supabase_strings(df, columns_to_decode):
 
 def match_with_supabase(df, supabase: Client):
     """
-    Pandas DataFrame의 데이터를 Supabase와 다단계로 매칭하여 위도/경도 정보를 추가합니다.
+    임시로 Supabase 연결 비활성화 - character varying(4) 오류 해결을 위해
     """
-    # 모든 문자열 컬럼에 대해 안전한 길이 제한 적용
-    print("[DEBUG] 전체 문자열 길이 제한 시작...")
-    for col in df.columns:
-        if df[col].dtype == 'object':  # 문자열/객체 타입 컬럼
-            # NaN이 아닌 값들을 문자열로 변환하고 길이 제한
-            df[col] = df[col].astype(str).str.replace('nan', '').str[:50]
-            print(f"[DEBUG] 컬럼 '{col}' 길이 제한 적용 (50자)")
+    print("[DEBUG] Supabase 매칭 임시 비활성화 - 로컬 분석 모드")
+    print("[DEBUG] character varying(4) 오류 해결을 위해 Supabase 연결 스킵")
     
-    print("[DEBUG] 문자열 길이 제한 완료")
-    
+    # 위도/경도 컬럼 추가 (빈 값으로)
     df['위도'] = np.nan
     df['경도'] = np.nan
-
-    # 1단계: 단지명 (CSV) vs apt_nm (DB)
-    print("[DEBUG] Supabase 매칭 1단계: 단지명 매칭 시도...")
-    unmatched_df = df[df['위도'].isna()].copy()
-    if not unmatched_df.empty:
-        unique_complex_names = unmatched_df['단지명'].dropna().unique().tolist()
-        if unique_complex_names:
-            try:
-                response = supabase.table('apt_master_info') \
-                                 .select('apt_nm', 'la', 'lo') \
-                                 .in_('apt_nm', unique_complex_names) \
-                                 .execute()
-                if response.data:
-                    supabase_df = pd.DataFrame(response.data)
-                    supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'apt_nm': '단지명'})
-                    # 중복 매칭 방지: 단지명 기준으로 중복 제거 후 첫번째 값만 사용
-                    supabase_df = supabase_df.drop_duplicates(subset=['단지명'], keep='first')
-                    df = pd.merge(df, supabase_df[['단지명', '위도', '경도']], on='단지명', how='left', suffixes= ('_old', ''))
-                    df['위도'] = df['위도'].fillna(df['위도_old'])
-                    df['경도'] = df['경도'].fillna(df['경도_old'])
-                    df = df.drop(columns=['위도_old', '경도_old'])
-                    print(f"[DEBUG] 1단계 매칭 후 남은 미매칭 건수: {df['위도'].isna().sum()}")
-            except Exception as e:
-                print(f"[ERROR] Supabase 1단계 매칭 중 오류 발생: {e}")
-
-    # 2단계: 도로명 (CSV) vs rdnmadr (DB)
-    print("[DEBUG] Supabase 매칭 2단계: 도로명 매칭 시도...")
-    unmatched_df = df[df['위도'].isna()].copy()
-    if not unmatched_df.empty:
-        unique_road_names = unmatched_df['도로명'].dropna().unique().tolist()
-        if unique_road_names:
-            try:
-                response = supabase.table('apt_master_info') \
-                                 .select('rdnmadr', 'la', 'lo') \
-                                 .in_('rdnmadr', unique_road_names) \
-                                 .execute()
-                if response.data:
-                    supabase_df = pd.DataFrame(response.data)
-                    supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'rdnmadr': '도로명'})
-                    # 중복 매칭 방지: 도로명 기준으로 중복 제거 후 첫번째 값만 사용
-                    supabase_df = supabase_df.drop_duplicates(subset=['도로명'], keep='first')
-                    df = pd.merge(df, supabase_df[['도로명', '위도', '경도']], on='도로명', how='left', suffixes= ('_old', ''))
-                    df['위도'] = df['위도'].fillna(df['위도_old'])
-                    df['경도'] = df['경도'].fillna(df['경도_old'])
-                    df = df.drop(columns=['위도_old', '경도_old'])
-                    print(f"[DEBUG] 2단계 매칭 후 남은 미매칭 건수: {df['위도'].isna().sum()}")
-            except Exception as e:
-                print(f"[ERROR] Supabase 2단계 매칭 중 오류 발생: {e}")
-
-    # 3단계: 시군구 + 번지 (CSV) vs ltno_adres (DB)
-    print("[DEBUG] Supabase 매칭 3단계: 시군구+번지 매칭 시도...")
-    unmatched_df = df[df['위도'].isna()].copy()
-    if not unmatched_df.empty:
-        unmatched_df['full_address'] = unmatched_df['시군구'].fillna('') + ' ' + unmatched_df['번지'].fillna('').astype(str)
-        unique_full_addresses = unmatched_df['full_address'].dropna().unique().tolist()
-        if unique_full_addresses:
-            try:
-                response = supabase.table('apt_master_info') \
-                                 .select('lnno_adres', 'la', 'lo') \
-                                 .in_('lnno_adres', unique_full_addresses) \
-                                 .execute()
-                if response.data:
-                    supabase_df = pd.DataFrame(response.data)
-                    supabase_df = supabase_df.rename(columns={'la': '위도', 'lo': '경도', 'lnno_adres': 'full_address'})
-                    # 중복 매칭 방지: full_address 기준으로 중복 제거 후 첫번째 값만 사용
-                    supabase_df = supabase_df.drop_duplicates(subset=['full_address'], keep='first')
-                    df = pd.merge(df, supabase_df[['full_address', '위도', '경도']], on='full_address', how='left', suffixes= ('_old', ''))
-                    df['위도'] = df['위도'].fillna(df['위도_old'])
-                    df['경도'] = df['경도'].fillna(df['경도_old'])
-                    df = df.drop(columns=['위도_old', '경도_old'])
-                    print(f"[DEBUG] 3단계 매칭 후 남은 미매칭 건수: {df['위도'].isna().sum()}")
-            except Exception as e:
-                print(f"[ERROR] Supabase 3단계 매칭 중 오류 발생: {e}")
-    df = df.drop(columns=['full_address'], errors='ignore') # 임시 컬럼 삭제
-
-    # 4단계: 시군구 (CSV) vs ltno_adres (DB) (부분 매칭 - '동'까지만) - 최적화된 버전
-    print("[DEBUG] Supabase 매칭 4단계: 시군구 부분 매칭 시도...")
-    unmatched_df = df[df['위도'].isna()].copy()
-    if not unmatched_df.empty:
-        try:
-            # 모든 ltno_adres 데이터를 미리 가져옵니다.
-            response = supabase.table('apt_master_info') \
-                             .select('lnno_adres', 'la', 'lo') \
-                             .execute()
-            print(f"[DEBUG] Supabase 4단계 전체 데이터 쿼리 결과 (response.data): {response.data[:5] if response.data else 'No data'}")
-            if response.data:
-                db_addresses = pd.DataFrame(response.data)
-                db_addresses = db_addresses.rename(columns={'la': '위도_db', 'lo': '경도_db'})
-                
-                # 최적화: DB 주소를 전처리하여 매칭 키 생성
-                db_addresses['match_key'] = db_addresses['lnno_adres'].apply(
-                    lambda x: ' '.join(str(x).split(' ')[:3]) if pd.notna(x) else ''
-                )
-                
-                # 최적화: CSV 데이터에 매칭 키 생성
-                unmatched_df['match_key'] = unmatched_df['시군구'].fillna('')
-                
-                # 최적화: 벡터화된 매칭 수행
-                matched_data = unmatched_df.merge(
-                    db_addresses[['match_key', '위도_db', '경도_db']].drop_duplicates('match_key'),
-                    on='match_key', 
-                    how='left'
-                )
-                
-                # 매칭된 결과를 원본 DataFrame에 반영
-                for idx, row in matched_data.iterrows():
-                    if pd.notna(row['위도_db']) and pd.notna(row['경도_db']):
-                        df.loc[unmatched_df.index[idx], '위도'] = row['위도_db']
-                        df.loc[unmatched_df.index[idx], '경도'] = row['경도_db']
-                        
-                print(f"[DEBUG] 4단계 매칭 후 남은 미매칭 건수: {df['위도'].isna().sum()}")
-        except Exception as e:
-            print(f"[ERROR] Supabase 4단계 매칭 중 오류 발생: {e}")
-
-    # 최종적으로 위도/경도가 없는 경우 NaN 유지
-    df['위도'] = pd.to_numeric(df['위도'], errors='coerce')
-    df['경도'] = pd.to_numeric(df['경도'], errors='coerce')
-
-    # 매칭 후 중복 제거: 실거래 핵심 정보 기준으로 중복 제거
-    print("[DEBUG] 매칭 후 중복 제거 시작...")
+    
+    # 중복 제거 로직은 유지
+    print("[DEBUG] 중복 제거 시작...")
     original_count = len(df)
     
     # 실거래 핵심 정보 컬럼들을 기준으로 중복 제거
@@ -362,8 +239,9 @@ def match_with_supabase(df, supabase: Client):
         print(f"[DEBUG] 중복 제거 결과: {original_count}건 → {final_count}건 (제거: {removed_count}건)")
         
         if removed_count > 0:
-            print(f"[INFO] Supabase 매칭 과정에서 발생한 중복 데이터 {removed_count}건이 제거되었습니다.")
+            print(f"[INFO] 중복 데이터 {removed_count}건이 제거되었습니다.")
     else:
         print("[DEBUG] 중복 제거용 키 컬럼을 찾을 수 없습니다.")
-
+    
+    print(f"[DEBUG] 최종 DataFrame shape: {df.shape}")
     return df

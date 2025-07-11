@@ -181,29 +181,16 @@ def upload_file():
             df = pd.read_csv(temp_path, encoding='utf-8-sig')
             print(f"[UPLOAD] DataFrame loaded from temp_path. Columns: {df.columns.tolist()}")
             print(f"[UPLOAD] DataFrame head:\n{df.head()}")
-            print("[UPLOAD] Calling match_with_supabase...")
-            df = match_with_supabase(df, supabase)
-            print(f"[UPLOAD] match_with_supabase returned. Columns: {df.columns.tolist()}")
-            print(f"[UPLOAD] DataFrame head after Supabase match:\n{df.head()}")
-            # --- 여기서 DB에서 la, lo를 다시 읽어와 최신 좌표로 덮어쓰기 ---
-            for idx, row in df.iterrows():
-                apt_nm = row.get('단지명', '')
-                rdnmadr = row.get('도로명', '')
-                lnno_adres = f"{row.get('시군구', '')} {row.get('번지', '')}"
-                use_aprv_yr = row.get('건축년도', '')
-                # DB에서 해당 단지의 la, lo 조회 (4개 컬럼 모두 일치)
-                res = supabase.table('apt_master_info')\
-                    .select('la,lo')\
-                    .eq('apt_nm', apt_nm)\
-                    .eq('rdnmadr', rdnmadr)\
-                    .eq('lnno_adres', lnno_adres)\
-                    .eq('use_aprv_yr', use_aprv_yr)\
-                    .limit(1).execute()
-                if res.data and res.data[0].get('la') and res.data[0].get('lo'):
-                    df.at[idx, '위도'] = res.data[0]['la']
-                    df.at[idx, '경도'] = res.data[0]['lo']
-            # 매칭 안 된 아파트 신규 DB 추가
-            insert_new_apartments_to_supabase(df, supabase)
+            print("[UPLOAD] Supabase 매칭 임시 비활성화...")
+            # df = match_with_supabase(df, supabase)  # 임시 비활성화
+            # 위도/경도 컬럼 추가 (빈 값으로)
+            df['위도'] = np.nan
+            df['경도'] = np.nan
+            print(f"[UPLOAD] 로컬 분석 모드 완료. Columns: {df.columns.tolist()}")
+            print(f"[UPLOAD] DataFrame head after local processing:\n{df.head()}")
+            # Supabase 좌표 매칭 임시 비활성화
+            print("[UPLOAD] Supabase 좌표 매칭 및 신규 데이터 추가 임시 비활성화...")
+            # 모든 Supabase DB 호출 비활성화
             # 분석 결과를 캐시 파일로 저장
             df.to_csv(analyzed_path, index=False, encoding='utf-8-sig')
             temp_path = analyzed_path
