@@ -198,32 +198,35 @@ def upload_file():
             df['위도'] = np.nan
             df['경도'] = np.nan
             
-            # 주소 기반 좌표 변환 (다양한 주소 형식 시도)
+            # 빠른 좌표 변환 (시군구별로 한 번만 호출)
+            print("[UPLOAD] 빠른 좌표 변환 시작...")
             converted_count = 0
-            for idx, row in df.head(50).iterrows():
-                # 다양한 주소 형식 시도
-                address_formats = [
-                    f"{row.get('시군구', '')} {row.get('단지명', '')}",  # 기본 형식
-                    f"{row.get('시군구', '')} {row.get('번지', '')}",     # 시군구 + 번지
-                    f"{row.get('도로명', '')}",                         # 도로명만
-                    f"{row.get('시군구', '')}",                         # 시군구만
-                ]
-                
-                lat, lon = None, None
-                for address in address_formats:
-                    if address and address.strip():
-                        print(f"[UPLOAD] 좌표 변환 시도: {address}")
-                        lat, lon = get_latlon_from_address(address)
-                        if lat and lon:
-                            df.at[idx, '위도'] = lat
-                            df.at[idx, '경도'] = lon
-                            converted_count += 1
-                            print(f"[UPLOAD] ✅ 좌표 변환 성공 ({converted_count}): {address} -> {lat}, {lon}")
-                            break
-                        else:
-                            print(f"[UPLOAD] ❌ 좌표 변환 실패: {address}")
+            location_cache = {}  # 지역별 좌표 캐시
             
-            print(f"[UPLOAD] 총 {converted_count}건의 좌표 변환 완료")
+            # 고유한 시군구 목록 추출
+            unique_locations = df['시군구'].dropna().unique()[:10]  # 최대 10개 지역만
+            
+            # 각 지역의 대표 좌표 획득
+            for location in unique_locations:
+                if location not in location_cache:
+                    print(f"[UPLOAD] 지역 좌표 변환: {location}")
+                    lat, lon = get_latlon_from_address(location)
+                    if lat and lon:
+                        location_cache[location] = (lat, lon)
+                        print(f"[UPLOAD] ✅ 지역 좌표 성공: {location} -> {lat}, {lon}")
+                    else:
+                        print(f"[UPLOAD] ❌ 지역 좌표 실패: {location}")
+            
+            # 모든 데이터에 지역별 좌표 적용
+            for idx, row in df.iterrows():
+                location = row.get('시군구', '')
+                if location in location_cache:
+                    lat, lon = location_cache[location]
+                    df.at[idx, '위도'] = lat
+                    df.at[idx, '경도'] = lon
+                    converted_count += 1
+            
+            print(f"[UPLOAD] 총 {converted_count}건의 좌표 변환 완료 (캐시 활용)")
             
             print(f"[UPLOAD] Kakao 좌표 변환 완료. Columns: {df.columns.tolist()}")
             print(f"[UPLOAD] DataFrame head after local processing:\n{df.head()}")
