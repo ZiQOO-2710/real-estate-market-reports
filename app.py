@@ -193,46 +193,20 @@ def upload_file():
             print(f"[UPLOAD] DataFrame head:\n{df.head()}")
             print("[UPLOAD] Supabase 매칭 재활성화...")
             df = match_with_supabase(df, supabase)  # 재활성화
-            # Kakao Maps API는 match_with_supabase 내부에서 처리
-            print("[UPLOAD] Kakao Maps API로 좌표 변환 시작...")
-            df['위도'] = np.nan
-            df['경도'] = np.nan
             
-            # 빠른 좌표 변환 (시군구별로 한 번만 호출)
-            print("[UPLOAD] 빠른 좌표 변환 시작...")
-            converted_count = 0
-            location_cache = {}  # 지역별 좌표 캐시
+            # 신규 아파트 정보 DB 저장
+            print("[UPLOAD] 신규 아파트 정보 DB 저장...")
+            try:
+                insert_new_apartments_to_supabase(df, supabase)
+                print("[UPLOAD] 신규 아파트 정보 DB 저장 완료")
+            except Exception as e:
+                print(f"[UPLOAD] 신규 아파트 정보 DB 저장 실패: {e}")
             
-            # 고유한 시군구 목록 추출
-            unique_locations = df['시군구'].dropna().unique()[:10]  # 최대 10개 지역만
+            # 좌표 변환 및 DB 저장 완료
+            print("[UPLOAD] 좌표 변환 및 DB 저장 완료")
+            print(f"[UPLOAD] DataFrame columns: {df.columns.tolist()}")
+            print(f"[UPLOAD] DataFrame head:\n{df.head()}")
             
-            # 각 지역의 대표 좌표 획득
-            for location in unique_locations:
-                if location not in location_cache:
-                    print(f"[UPLOAD] 지역 좌표 변환: {location}")
-                    lat, lon = get_latlon_from_address(location)
-                    if lat and lon:
-                        location_cache[location] = (lat, lon)
-                        print(f"[UPLOAD] ✅ 지역 좌표 성공: {location} -> {lat}, {lon}")
-                    else:
-                        print(f"[UPLOAD] ❌ 지역 좌표 실패: {location}")
-            
-            # 모든 데이터에 지역별 좌표 적용
-            for idx, row in df.iterrows():
-                location = row.get('시군구', '')
-                if location in location_cache:
-                    lat, lon = location_cache[location]
-                    df.at[idx, '위도'] = lat
-                    df.at[idx, '경도'] = lon
-                    converted_count += 1
-            
-            print(f"[UPLOAD] 총 {converted_count}건의 좌표 변환 완료 (캐시 활용)")
-            
-            print(f"[UPLOAD] Kakao 좌표 변환 완료. Columns: {df.columns.tolist()}")
-            print(f"[UPLOAD] DataFrame head after local processing:\n{df.head()}")
-            # Supabase 좌표 매칭 임시 비활성화
-            print("[UPLOAD] Supabase 좌표 매칭 및 신규 데이터 추가 임시 비활성화...")
-            # 모든 Supabase DB 호출 비활성화
             # 분석 결과를 캐시 파일로 저장
             df.to_csv(analyzed_path, index=False, encoding='utf-8-sig')
             temp_path = analyzed_path
