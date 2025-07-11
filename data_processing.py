@@ -255,23 +255,53 @@ def match_with_supabase(df, supabase: Client):
     missing_coords = df[df['위도'].isna()]
     
     if not missing_coords.empty:
-        unique_locations = missing_coords['시군구'].dropna().unique()[:10]
         location_cache = {}
         
-        for location in unique_locations:
-            print(f"[DEBUG] Kakao API 조회: {location}")
-            lat, lon = get_latlon_from_address(location)
-            if lat and lon:
-                location_cache[location] = (lat, lon)
-                print(f"[DEBUG] Kakao API 성공: {location} -> {lat}, {lon}")
-        
-        # 좌표 적용
+        # 우선순위: 도로명 → 시군구+번지 → 시군구+단지명 → 시군구
         for idx, row in missing_coords.iterrows():
-            location = row.get('시군구', '')
-            if location in location_cache:
-                lat, lon = location_cache[location]
-                df.at[idx, '위도'] = lat
-                df.at[idx, '경도'] = lon
+            address_candidates = []
+            
+            # 1순위: 도로명 주소
+            if row.get('도로명'):
+                road_addr = f"{row.get('시군구', '')} {row.get('도로명', '')}".strip()
+                address_candidates.append(road_addr)
+            
+            # 2순위: 시군구 + 번지
+            if row.get('번지'):
+                jibun_addr = f"{row.get('시군구', '')} {row.get('번지', '')}".strip()
+                address_candidates.append(jibun_addr)
+            
+            # 3순위: 시군구 + 단지명
+            if row.get('단지명'):
+                complex_addr = f"{row.get('시군구', '')} {row.get('단지명', '')}".strip()
+                address_candidates.append(complex_addr)
+            
+            # 4순위: 시군구만
+            if row.get('시군구'):
+                district_addr = row.get('시군구', '').strip()
+                address_candidates.append(district_addr)
+            
+            # 주소 후보들을 순서대로 시도
+            coords_found = False
+            for addr in address_candidates:
+                if addr and addr not in location_cache:
+                    print(f"[DEBUG] Kakao API 조회: {addr}")
+                    lat, lon = get_latlon_from_address(addr)
+                    if lat and lon:
+                        location_cache[addr] = (lat, lon)
+                        print(f"[DEBUG] Kakao API 성공: {addr} -> {lat}, {lon}")
+                
+                if addr in location_cache:
+                    lat, lon = location_cache[addr]
+                    df.at[idx, '위도'] = lat
+                    df.at[idx, '경도'] = lon
+                    coords_found = True
+                    break
+            
+            if not coords_found:
+                print(f"[DEBUG] 좌표 조회 실패: {row.get('시군구', '')} {row.get('단지명', '')}")
+        
+        print(f"[DEBUG] 총 {len(location_cache)}개 고유 주소 조회 완료")
     
     # 중복 제거
     print("[DEBUG] 중복 제거 시작...")
