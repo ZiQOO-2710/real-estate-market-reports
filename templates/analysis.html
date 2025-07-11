@@ -67,12 +67,17 @@
                 <div class="card">
                     <div class="card-header bg-primary text-white">
                         <h2 class="h5 mb-0">지역별 거래 건수 (상위 5개)</h2>
+                        <small>💡 클릭하면 소재지번에 자동 입력됩니다</small>
                     </div>
                     <div class="card-body">
                         <ul class="list-group">
                             {% for region, count in stats.regions.items() %}
                                 {% if loop.index <= 5 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <li class="list-group-item d-flex justify-content-between align-items-center clickable-region" 
+                                    onclick="fillAddress('{{ region }}')" 
+                                    style="cursor: pointer; transition: background-color 0.2s;"
+                                    onmouseover="this.style.backgroundColor='#f8f9fa'"
+                                    onmouseout="this.style.backgroundColor=''">
                                     {{ region }}
                                     <span class="badge bg-primary rounded-pill">{{ count }}건</span>
                                 </li>
@@ -87,12 +92,17 @@
                 <div class="card">
                     <div class="card-header bg-info text-white">
                         <h2 class="h5 mb-0">단지별 거래 건수 (상위 5개)</h2>
+                        <small>💡 클릭하면 소재지번에 자동 입력됩니다</small>
                     </div>
                     <div class="card-body">
                         <ul class="list-group">
                             {% for complex, count in stats.complexes.items() %}
                                 {% if loop.index <= 5 %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <li class="list-group-item d-flex justify-content-between align-items-center clickable-complex" 
+                                    onclick="fillAddress('{{ complex }}')" 
+                                    style="cursor: pointer; transition: background-color 0.2s;"
+                                    onmouseover="this.style.backgroundColor='#f8f9fa'"
+                                    onmouseout="this.style.backgroundColor=''">
                                     {{ complex }}
                                     <span class="badge bg-info rounded-pill">{{ count }}건</span>
                                 </li>
@@ -204,9 +214,28 @@
     <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script>
-        // 주소 자동 입력 함수
+        // 주소 자동 입력 함수 (개선된 버전)
         function fillAddress(address) {
-            document.getElementById('address').value = address;
+            const addressInput = document.getElementById('address');
+            const originalValue = addressInput.value;
+            
+            // 입력란에 주소 설정
+            addressInput.value = address;
+            
+            // 시각적 피드백 제공
+            addressInput.style.transition = 'all 0.3s ease';
+            addressInput.style.backgroundColor = '#e3f2fd';
+            addressInput.style.borderColor = '#2196f3';
+            addressInput.focus();
+            
+            // 잠시 후 원래 스타일로 복원
+            setTimeout(() => {
+                addressInput.style.backgroundColor = '';
+                addressInput.style.borderColor = '';
+            }, 1500);
+            
+            // 콘솔 로그로 디버깅
+            console.log(`[주소 자동 입력] "${address}" 입력 완료`);
         }
         
         function showLoadingIndicator() {
