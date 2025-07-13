@@ -1,0 +1,88 @@
+{
+  "name": "real-estate-platform",
+  "version": "1.0.0",
+  "description": "부동산 개발자를 위한 지도 기반 시장 분석 플랫폼",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "clean": "rm -rf node_modules backend/node_modules frontend/node_modules",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed",
+    "db:reset": "cd backend && npm run db:reset",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "format": "npm run format:backend && npm run format:frontend",
+    "format:backend": "cd backend && npm run format",
+    "format:frontend": "cd frontend && npm run format",
+    "type-check": "npm run type-check:backend && npm run type-check:frontend",
+    "type-check:backend": "cd backend && npm run type-check",
+    "type-check:frontend": "cd frontend && npm run type-check",
+    "crawl:start": "cd backend && npm run crawl:start",
+    "crawl:stop": "cd backend && npm run crawl:stop",
+    "backup:db": "cd scripts && ./backup-database.sh",
+    "deploy:staging": "cd deployment && ./deploy-staging.sh",
+    "deploy:production": "cd deployment && ./deploy-production.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-username/real-estate-platform.git"
+  },
+  "keywords": [
+    "real-estate",
+    "platform",
+    "analysis",
+    "maps",
+    "property",
+    "development",
+    "korea",
+    "market-research"
+  ],
+  "author": "지쿠 & 클로디 (Claude Code)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/your-username/real-estate-platform/issues"
+  },
+  "homepage": "https://github.com/your-username/real-estate-platform#readme",
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "**/*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm run type-check && npm run test"
+    }
+  }
+}

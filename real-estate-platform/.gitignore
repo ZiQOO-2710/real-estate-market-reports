@@ -1,0 +1,151 @@
+# 부동산 플랫폼 .gitignore
+
+# === 환경 및 설정 파일 ===
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+*.local
+
+# === Node.js ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# === 빌드 출력 ===
+dist/
+build/
+.next/
+out/
+
+# === 로그 파일 ===
+logs/
+*.log
+log/
+
+# === 런타임 파일 ===
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# === 캐시 및 임시 파일 ===
+.cache/
+.tmp/
+tmp/
+.temp/
+*.tmp
+*.swp
+*.swo
+*~
+
+# === IDE 및 에디터 ===
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# === 운영체제 ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# === 테스트 커버리지 ===
+coverage/
+*.lcov
+.nyc_output/
+
+# === 패키지 관리자 ===
+.npm
+.eslintcache
+.pnpm-store/
+
+# === 데이터베이스 ===
+database/backups/*.sql
+database/backups/*.dump
+*.sqlite
+*.sqlite3
+*.db
+
+# === 업로드 파일 ===
+uploads/
+public/uploads/
+static/uploads/
+
+# === SSL 인증서 ===
+*.pem
+*.key
+*.crt
+*.csr
+
+# === Docker ===
+docker-compose.override.yml
+.dockerignore
+
+# === 모니터링 및 로그 ===
+prometheus/
+grafana/
+logs/
+*.log
+
+# === 백업 파일 ===
+*.bak
+*.backup
+backup/
+
+# === 설정 파일 오버라이드 ===
+config/local.json
+config/production.json
+
+# === 크롤링 데이터 ===
+crawl-data/
+scraped-data/
+data-cache/
+
+# === 지도 타일 캐시 ===
+map-tiles/
+tile-cache/
+
+# === 리포트 파일 ===
+reports/
+export/
+downloads/
+
+# === 성능 분석 ===
+.profiling/
+benchmarks/
+
+# === Terraform (인프라) ===
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# === Kubernetes ===
+k8s-secrets/
+*.kubeconfig
+
+# === 개발 도구 ===
+.storybook-static/
+chromatic-build/
+
+# === API 키 및 시크릿 ===
+secrets/
+api-keys/
+credentials/
+
+# === 프로젝트 특화 ===
+real-estate-data/
+market-analysis/
+price-history/
