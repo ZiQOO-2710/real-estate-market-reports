@@ -12,6 +12,7 @@ import { setScreenSize } from '@/store/slices/uiSlice';
 
 // 페이지 컴포넌트들
 import Dashboard from '@/pages/Dashboard';
+import MapPage from './pages/MapPage';
 import Analytics from '@/pages/Analytics';
 import Projects from '@/pages/Projects';
 import Settings from '@/pages/Settings';
@@ -224,6 +225,7 @@ const AppContent: React.FC = () => {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/map" element={<MapPage />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/settings" element={<Settings />} />

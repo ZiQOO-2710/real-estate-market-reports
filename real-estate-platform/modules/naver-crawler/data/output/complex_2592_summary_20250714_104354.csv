@@ -1,0 +1,2 @@
+complex_id,complex_name,address,completion_year,households,total_listings,total_transactions,price_min,price_max,price_avg,deal_types,areas_count,floors_count,source_url,screenshot_path
+2592,네이버페이부동산,정보없음,2030,298,25,40,80000,220000,140833,"매매, 전세",49,5,"https://new.land.naver.com/complexes/2592?ms=37.36286,127.115578,17&a=APT:ABYG:JGC:PRE&e=RETAIL",data/output/screenshot_2592_20250714_104353.png

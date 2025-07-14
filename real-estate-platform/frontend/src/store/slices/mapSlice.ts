@@ -80,6 +80,22 @@ const mapSlice = createSlice({
       state.selectedMarker = action.payload;
     },
 
+    setSelectedMarker: (state, action: PayloadAction<MapMarker | null>) => {
+      state.selectedMarker = action.payload;
+    },
+
+    setMapType: (state, action: PayloadAction<string>) => {
+      // 지도 타입 변경은 컴포넌트에서 직접 처리
+    },
+
+    setTrafficLayer: (state, action: PayloadAction<boolean>) => {
+      // 교통정보 레이어 상태 저장 (필요시)
+    },
+
+    setBikeLayer: (state, action: PayloadAction<boolean>) => {
+      // 자전거 도로 레이어 상태 저장 (필요시)
+    },
+
     addLayer: (state, action: PayloadAction<MapLayer>) => {
       state.layers.push(action.payload);
     },
@@ -139,6 +155,10 @@ export const {
   updateMarkers,
   clearMarkers,
   selectMarker,
+  setSelectedMarker,
+  setMapType,
+  setTrafficLayer,
+  setBikeLayer,
   addLayer,
   updateLayer,
   toggleLayerVisibility,

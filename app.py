@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, redirect, url_for, send_file, session, flash
-from supabase import create_client, Client
+from supabase import create_client
 
 # .env 파일 로드
 try:
@@ -14,26 +14,22 @@ except Exception as e:
 import pandas as pd
 import numpy as np
 from werkzeug.utils import secure_filename
-import tempfile
-import shutil
 from datetime import datetime
 import io
 import requests
-from typing import Optional
 import hashlib
 import time
 import re
 
 # --- Custom Modules ---
-from config import get_config, Config
+from config import get_config
 from data_processing import (
-    normalize_columns,
     process_uploaded_csv,
     get_stats,
     clean_for_json,
     match_with_supabase
 )
-from map_utils import get_latlon_from_address, clear_cache
+from map_utils import get_latlon_from_address
 
 # --- Application Factory ---
 def create_app(config_name='default'):
@@ -61,19 +57,14 @@ def create_app(config_name='default'):
     )
     
     # 애플리케이션 컨텍스트에 클라이언트 저장
-    app.supabase = supabase
+    setattr(app, 'supabase', supabase)
     
-    # 파일 크기 초과 오류 핸들러
-    @app.errorhandler(413)
-    def request_entity_too_large(error):
-        flash('파일 크기가 너무 큽니다. 최대 50MB까지 업로드 가능합니다.', 'error')
-        return redirect(url_for('index'))
     
     return app
 
 # --- 애플리케이션 생성 ---
 app = create_app(os.environ.get('FLASK_ENV', 'default'))
-supabase = app.supabase
+supabase = getattr(app, 'supabase')
 
 # --- 신규 아파트 DB 추가 함수 ---
 def insert_new_apartments_to_supabase(df, supabase):
@@ -485,8 +476,8 @@ def show_filtered_results():
             'center_lat': float(center_lat) if center_lat else 37.5665,  # 서울시청 좌표
             'center_lon': float(center_lon) if center_lon else 126.978,
             'radius': radius_m,
-            'first_lat': float(data_records[0].get('위도', 0)) if data_records else None,
-            'first_lon': float(data_records[0].get('경도', 0)) if data_records else None,
+            'first_lat': None,
+            'first_lon': None,
             'pagination': pagination_info
         }
         

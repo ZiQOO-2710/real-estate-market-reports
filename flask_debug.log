@@ -1,0 +1,31 @@
+ * Serving Flask app 'app'
+ * Debug mode: on
+[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8004
+ * Running on http://172.30.152.98:8004
+[33mPress CTRL+C to quit[0m
+ * Restarting with stat
+ * Debugger is active!
+ * Debugger PIN: 965-260-013
+172.30.144.1 - - [09/Jul/2025 16:29:53] "GET / HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:29:53] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:29:53] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:29:59] "GET / HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:29:59] "GET /static/js/main.js HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:29:59] "GET /static/css/style.css HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:29:59] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+172.30.144.1 - - [09/Jul/2025 16:30:07] "POST /upload HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:30:08] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:08] "[36mGET /static/js/navigation.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:08] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:13] "[32mPOST /filter HTTP/1.1[0m" 302 -
+172.30.144.1 - - [09/Jul/2025 16:30:13] "GET /results HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:30:13] "[36mGET /static/js/navigation.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:17] "GET /analysis HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:30:17] "[36mGET /static/css/style.css HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:17] "[36mGET /static/js/navigation.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:17] "[36mGET /static/js/main.js HTTP/1.1[0m" 304 -
+172.30.144.1 - - [09/Jul/2025 16:30:25] "[32mPOST /filter HTTP/1.1[0m" 302 -
+172.30.144.1 - - [09/Jul/2025 16:30:25] "GET /results HTTP/1.1" 200 -
+172.30.144.1 - - [09/Jul/2025 16:30:25] "[36mGET /static/js/navigation.js HTTP/1.1[0m" 304 -
