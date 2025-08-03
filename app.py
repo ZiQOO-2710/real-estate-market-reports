@@ -14,8 +14,6 @@ except Exception as e:
 import pandas as pd
 import numpy as np
 from werkzeug.utils import secure_filename
-import tempfile
-import shutil
 from datetime import datetime
 import io
 import requests

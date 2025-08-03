@@ -5,7 +5,6 @@ import os
 from supabase import Client
 import tempfile
 from datetime import datetime
-import shutil
 import chardet
 import gc
 import atexit
